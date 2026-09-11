@@ -321,6 +321,29 @@
   .rt-fail{ font-size:12px; color:var(--status-ink); background:var(--status-soft);
     border:1px solid var(--status); border-radius:8px; padding:9px 11px; line-height:1.55; }
 
+  /* 최근 30시간 상세 — 강수(막대)와 수위(선)를 y축 하나씩 가진 작은 차트 둘로 쌓는다.
+     한 그림에 두 축을 겹치면 축척이 다른 두 양을 잘못 비교하게 되므로 나눈다. */
+  .detail-card .dc-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:2px; }
+  .detail-card .dc-name{ font-size:14px; font-weight:600; }
+  .detail-card .dc-sub{ font-size:11px; color:var(--ink-muted); }
+  .dc-chart{ display:block; width:100%; height:auto; }
+  .dc-axis{ font-size:9px; fill:var(--ink-muted); }
+  .dc-grid{ stroke:var(--border); stroke-width:1; }
+  .dc-thr{ stroke-width:1.2; stroke-dasharray:3 3; }
+  .dc-thr-label{ font-size:9px; font-weight:600; }
+  .dc-line{ fill:none; stroke:var(--seq-500); stroke-width:2; stroke-linejoin:round; }
+  .dc-area{ fill:var(--seq-200); opacity:.3; }
+  .dc-end{ fill:var(--seq-600); stroke:var(--surface-2); stroke-width:1.6; }
+  .dc-endlabel{ font-size:10.5px; font-weight:700; fill:var(--ink-primary); }
+  .dc-bar{ fill:#5aa9d6; }
+  .dc-cursor{ stroke:var(--accent); stroke-width:1.2; }
+  .dc-hit{ fill:transparent; cursor:crosshair; }
+  .dc-empty{ font-size:11.5px; color:var(--ink-secondary); background:var(--surface-3);
+             border-radius:8px; padding:9px 11px; line-height:1.55; }
+  .dc-delta{ font-size:11.5px; font-weight:700; }
+  .dc-delta.up{ color:#b8381a; }
+  .dc-delta.down{ color:var(--ink-secondary); }
+
   .rt-mark{ stroke:#f4fbf9; stroke-width:1.6; }
   .rt-mark-rain{ fill:#5aa9d6; fill-opacity:.42; stroke:#eaf6fc; stroke-width:1.2; }
   .rt-mark-hit{ fill:transparent; }
@@ -451,6 +474,16 @@
         <h2>실시간 현황 <span class="card-sub">(공공API 자동수집 · 매시간)</span></h2>
         <div class="rt-head"><span class="rt-stamp" id="rtStamp">불러오는 중…</span></div>
         <div id="rtBody"></div>
+      </div>
+
+      <div class="card detail-card" id="detailCard" hidden>
+        <h2>최근 30시간 <span class="card-sub">(목록에서 지점을 고르면 바뀝니다)</span></h2>
+        <div class="dc-head">
+          <span class="dc-name" id="dcName">–</span>
+          <span class="dc-sub" id="dcSub">–</span>
+          <span class="dc-delta mono" id="dcDelta"></span>
+        </div>
+        <div id="dcBody"></div>
       </div>
 
       <div class="side-grid">
@@ -1149,6 +1182,7 @@ async function loadJson(path){
 })();
 
 function renderRealtime(RT, failed, nTotal){
+  RT_ALL = RT;
   const body = document.getElementById("rtBody");
   const stampEl = document.getElementById("rtStamp");
 
@@ -1186,6 +1220,9 @@ function renderRealtime(RT, failed, nTotal){
   wireRowClicks();
   wireLayerToggles(RT);
   onViewBoxChange();
+  // 빈 카드로 두지 않도록, 여유가 가장 적은 지점을 처음부터 띄운다
+  const firstWl = document.querySelector('#rtBody .rt-row[data-kind="wl"]');
+  if(firstWl) showDetail(firstWl.dataset.code, "wl");
 }
 
 /* ---- 블록 1: 조류경보제 ---- */
@@ -1252,9 +1289,13 @@ function blockWaterlevel(W, F){
     <div class="rt-rows">`;
   withMargin.forEach(r=>{
     const p = (r.lon !== null && r.lat !== null) ? lonLatToSvg(r.lon, r.lat) : null;
-    h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}" data-frac="0.14">
+    const d24 = r.delta_24h;
+    const trend = (d24 === null || d24 === undefined) ? ""
+      : ` · 24h ${d24 > 0 ? "+" : ""}${d24.toFixed(2)}m`;
+    h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}"
+                  data-frac="0.14" data-code="${r.code}" data-kind="wl">
       <span class="rt-name">${r.name}
-        <span class="rt-sub">· 현재 ${r.latest_wl}m / 기준 ${r.lowest}m</span></span>
+        <span class="rt-sub">· 현재 ${r.latest_wl}m / 기준 ${r.lowest}m${trend}</span></span>
       <span class="rt-val mono"${r.margin<=0 ? ` style="color:${LV_FILL["경계"]}"` : ""}>${
         (r.margin>0?"+":"") + r.margin.toFixed(2)}</span>
       ${badge(r.risk_level)}
@@ -1281,7 +1322,8 @@ function blockRainfall(R){
     h += `<div class="rt-rows">`;
     wet.slice(0,6).forEach(r=>{
       const p = (r.lon !== null && r.lat !== null) ? lonLatToSvg(r.lon, r.lat) : null;
-      h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}" data-frac="0.14">
+      h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}"
+                    data-frac="0.14" data-code="${r.code}" data-kind="rain">
         <span class="rt-name">${r.name}
           <span class="rt-sub">· 직전 1시간 ${r.latest_1h_mm===null?"–":r.latest_1h_mm+"mm"}</span></span>
         <span class="rt-val mono">${r.sum_24h_mm.toFixed(1)}mm</span>
@@ -1351,13 +1393,147 @@ function drawRainfallMarkers(R){
   });
 }
 
-/* ---- 목록 클릭 → 지도 이동 ---- */
+/* ---- 목록 클릭 → 지도 이동 + 상세 차트 ---- */
 function wireRowClicks(){
   document.querySelectorAll("#rtBody .rt-row.clickable").forEach(btn=>{
     const x = parseFloat(btn.dataset.x), y = parseFloat(btn.dataset.y);
-    if(isNaN(x) || isNaN(y)){ btn.classList.remove("clickable"); return; }
-    btn.addEventListener("click", ()=> panToSvg(x, y, parseFloat(btn.dataset.frac)));
+    btn.addEventListener("click", ()=>{
+      if(!isNaN(x) && !isNaN(y)) panToSvg(x, y, parseFloat(btn.dataset.frac));
+      if(btn.dataset.code) showDetail(btn.dataset.code, btn.dataset.kind);
+    });
+    if(isNaN(x) || isNaN(y) && !btn.dataset.code) btn.classList.remove("clickable");
   });
+}
+
+/* ---- 최근 30시간 상세 (수집해둔 시계열 사용 — 추가 API 호출 없음) ---- */
+let RT_ALL = null;                       // renderRealtime 에서 채운다
+const HOURS_LABEL = t0 => fmtObsTime(t0);
+
+function seriesTimes(t0, n){
+  // t0 는 "YYYYMMDDHH". 한 칸이 1시간이므로 인덱스만으로 시각을 만들 수 있다.
+  const y = +t0.slice(0,4), mo = +t0.slice(4,6)-1, d = +t0.slice(6,8), h = +t0.slice(8,10);
+  const base = new Date(y, mo, d, h);
+  return Array.from({length:n}, (_, i) => new Date(base.getTime() + i*3600e3));
+}
+
+function showDetail(code, kind){
+  const card = document.getElementById("detailCard");
+  const rows = kind === "rain" ? (RT_ALL.rainfall||{}).rows : (RT_ALL.waterlevel||{}).rows;
+  const r = (rows||[]).find(x => x.code === code);
+  if(!r || !r.series || !r.series.length){
+    card.hidden = false;
+    document.getElementById("dcName").textContent = r ? r.name : "–";
+    document.getElementById("dcSub").textContent = "";
+    document.getElementById("dcDelta").textContent = "";
+    document.getElementById("dcBody").innerHTML =
+      `<div class="dc-empty">이 지점은 최근 시계열이 수집되지 않았습니다.</div>`;
+    return;
+  }
+  card.hidden = false;
+  document.getElementById("dcName").textContent = r.name;
+  const unit = kind === "rain" ? "mm/h" : "m";
+  document.getElementById("dcSub").textContent =
+    `${kind === "rain" ? "시간강수량" : "수위"} · ${HOURS_LABEL(r.series_t0)} 부터 ${r.series.length}시간`;
+  const dEl = document.getElementById("dcDelta");
+  if(kind !== "rain" && r.delta_24h !== null && r.delta_24h !== undefined){
+    dEl.textContent = `24시간 ${r.delta_24h > 0 ? "+" : ""}${r.delta_24h.toFixed(2)} m`;
+    dEl.className = "dc-delta mono " + (r.delta_24h > 0.05 ? "up" : "down");
+  } else { dEl.textContent = ""; dEl.className = "dc-delta mono"; }
+
+  const thresholds = kind === "rain" ? [] : [
+    ["관심", r.attwl, LV_FILL["관심"]], ["주의", r.wrnwl, LV_FILL["주의"]],
+    ["경계", r.almwl, LV_FILL["경계"]], ["심각", r.srswl, LV_FILL["심각"]],
+  ].filter(t => t[1] !== null && t[1] > 0);
+
+  document.getElementById("dcBody").innerHTML =
+    drawSeriesChart(r.series, r.series_t0, unit, thresholds, kind === "rain");
+  wireChartHover(r);
+}
+
+function drawSeriesChart(series, t0, unit, thresholds, asBars){
+  const W = 320, H = 132, L = 34, R = 30, T = 10, B = 20;
+  const vals = series.filter(v => v !== null);
+  if(!vals.length) return `<div class="dc-empty">유효한 관측값이 없습니다.</div>`;
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  // 기준수위가 현재 범위보다 훨씬 위에 있으면 선이 바닥에 눌려 변화가 안 보인다.
+  // 기준선은 '가장 가까운 한 단계'까지만 축에 넣는다.
+  const near = thresholds.filter(t => t[1] <= hi + (hi - lo || 1) * 6)
+                         .sort((a,b) => a[1]-b[1]).slice(0, 1);
+  near.forEach(t => { hi = Math.max(hi, t[1]); });
+  if(asBars) lo = 0;
+  const pad = (hi - lo) * 0.18 || 0.5;
+  hi += pad; lo -= asBars ? 0 : pad;
+  const n = series.length;
+  const X = i => L + (n === 1 ? 0 : i/(n-1) * (W-L-R));
+  const Y = v => H-B - (v-lo)/(hi-lo) * (H-T-B);
+
+  let g = `<line class="dc-grid" x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}"></line>`;
+  [lo + (hi-lo)*0.5, hi].forEach(v=>{
+    g += `<text class="dc-axis" x="${L-4}" y="${Y(v)+3}" text-anchor="end">${v.toFixed(1)}</text>`;
+  });
+  g += `<text class="dc-axis" x="${L-4}" y="${H-B+3}" text-anchor="end">${lo.toFixed(1)}</text>`;
+  near.forEach(([nm, v, col])=>{
+    g += `<line class="dc-thr" x1="${L}" y1="${Y(v)}" x2="${W-R}" y2="${Y(v)}" stroke="${col}"></line>`
+       + `<text class="dc-thr-label" x="${W-R+2}" y="${Y(v)+3}" fill="${col}">${nm}</text>`;
+  });
+
+  if(asBars){
+    const bw = (W-L-R)/n * 0.7;
+    series.forEach((v,i)=>{
+      if(v === null || v <= 0) return;
+      g += `<rect class="dc-bar" x="${X(i)-bw/2}" y="${Y(v)}" width="${bw}" height="${H-B-Y(v)}" rx="1"></rect>`;
+    });
+  } else {
+    let d = "", area = "", first = null, last = null;
+    series.forEach((v,i)=>{
+      if(v === null) return;
+      if(first === null) first = i;
+      last = i;
+      d += (d ? "L" : "M") + X(i) + "," + Y(v) + " ";
+    });
+    area = d + `L${X(last)},${H-B} L${X(first)},${H-B} Z`;
+    g += `<path class="dc-area" d="${area}"></path><path class="dc-line" d="${d}"></path>`;
+    const lv = series[last];
+    g += `<circle class="dc-end" cx="${X(last)}" cy="${Y(lv)}" r="3.4"></circle>`
+       + `<text class="dc-endlabel" x="${X(last)-6}" y="${Y(lv)-8}" text-anchor="end">${lv}${unit}</text>`;
+  }
+
+  const times = seriesTimes(t0, n);
+  const p = v => String(v).padStart(2,"0");
+  [0, Math.floor(n/2), n-1].forEach((i,k)=>{
+    g += `<text class="dc-axis" x="${X(i)}" y="${H-6}" text-anchor="${k===0?"start":k===2?"end":"middle"}">`
+       + `${p(times[i].getMonth()+1)}.${p(times[i].getDate())} ${p(times[i].getHours())}시</text>`;
+  });
+  g += `<g id="dcCursor"></g><rect class="dc-hit" id="dcHit" x="${L}" y="${T}" `
+     + `width="${W-L-R}" height="${H-T-B}"></rect>`;
+  return `<svg class="dc-chart" viewBox="0 0 ${W} ${H}" data-lo="${lo}" data-hi="${hi}"
+            data-l="${L}" data-r="${R}" data-t="${T}" data-b="${B}" data-w="${W}" data-h="${H}">${g}</svg>`;
+}
+
+function wireChartHover(r){
+  const svg = document.querySelector("#dcBody svg");
+  const hit = document.getElementById("dcHit");
+  if(!svg || !hit) return;
+  const ds = svg.dataset;
+  const L = +ds.l, R = +ds.r, W = +ds.w, T = +ds.t, H = +ds.h, B = +ds.b;
+  const lo = +ds.lo, hi = +ds.hi, n = r.series.length;
+  const times = seriesTimes(r.series_t0, n);
+  const cur = svg.querySelector("#dcCursor");
+  hit.addEventListener("mousemove", e=>{
+    const box = svg.getBoundingClientRect();
+    const ux = (e.clientX - box.left) / box.width * W;
+    let i = Math.round((ux - L)/(W-L-R) * (n-1));
+    i = Math.max(0, Math.min(n-1, i));
+    const v = r.series[i];
+    const x = L + i/(n-1) * (W-L-R);
+    cur.innerHTML = `<line class="dc-cursor" x1="${x}" y1="${T}" x2="${x}" y2="${H-B}"></line>`;
+    const p = q => String(q).padStart(2,"0");
+    tip.innerHTML = `<b>${r.name}</b><br>${p(times[i].getMonth()+1)}.${p(times[i].getDate())} `
+      + `${p(times[i].getHours())}:00<br>${v === null ? "관측 없음" : v}`;
+    tip.style.left = e.clientX+"px"; tip.style.top = e.clientY+"px";
+    tip.hidden = false;
+  });
+  hit.addEventListener("mouseleave", ()=>{ tip.hidden = true; cur.innerHTML = ""; });
 }
 
 /* ---- 레이어 on/off ---- */
