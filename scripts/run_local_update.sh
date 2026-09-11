@@ -42,7 +42,10 @@ fi
 set -a; . "$KEY_FILE"; set +a   # 키를 환경변수로 로드
 
 cd "$REPO_DIR"
-git pull --rebase --quiet || echo "경고: git pull 실패(계속 진행)"
+# --autostash: 작업트리에 커밋 안 된 변경(예: 직접 편집 중인 index.html)이 있어도
+# rebase 가 거부되지 않도록 임시 보관했다가 되돌린다. 없으면 "cannot pull with
+# rebase: You have unstaged changes" 로 매번 pull 이 건너뛰어진다.
+git pull --rebase --autostash --quiet || echo "경고: git pull 실패(계속 진행)"
 
 ok_hrfco=1; ok_algae=1
 "$PYTHON" scripts/fetch_hrfco.py || { ok_hrfco=0; echo "경고: HRFCO 수집 실패"; }
