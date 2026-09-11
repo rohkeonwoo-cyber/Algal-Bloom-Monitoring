@@ -1,3 +1,4 @@
 __pycache__/
 *.pyc
 *.env
+build/sat_bg_png_b64.txt

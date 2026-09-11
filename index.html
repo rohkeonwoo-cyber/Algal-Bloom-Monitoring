@@ -1,4 +1,6 @@
-<title>낙동강 고농도 시계열</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>낙동강 조류 모니터</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <style>
   .viz-root{
@@ -236,6 +238,82 @@
 
   footer{ margin-top:18px; font-size:11.5px; color:var(--ink-muted); line-height:1.7; }
 
+  /* ---- 실시간 레이어 ----
+     심각도 램프는 OKLCH에서 명도를 고르게 내려 생성하고, 인접쌍 색차(OKLab dE)가
+     19 이상인지 수치로 검증했다(build/색상검증.md). 색만으로 정보를 주지 않도록
+     배지에는 항상 등급 글자를 함께 넣고, 글자색은 대비 4.5:1 기준으로 정했다.
+     위성 배경(어두움) 위에서도 보이도록 마커에는 밝은 링을 두른다. */
+  .viz-root{
+    --lv-normal:#7e8984; --lv-normal-ink:#1a1f1d;
+    --lv-attn:#ffd95a;   --lv-attn-ink:#3a2c00;
+    --lv-warn:#e68920;   --lv-warn-ink:#301800;
+    --lv-alarm:#b8381a;  --lv-alarm-ink:#ffffff;
+    --lv-serious:#6e040b;--lv-serious-ink:#ffffff;
+  }
+  .lv-badge{
+    display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
+    font-size:11px; font-weight:700; padding:2px 7px; border-radius:5px;
+    letter-spacing:.2px; white-space:nowrap;
+  }
+  .lv-badge svg{ width:10px; height:10px; flex-shrink:0; }
+  .lv-normal { background:var(--lv-normal);  color:var(--lv-normal-ink); }
+  .lv-attn   { background:var(--lv-attn);    color:var(--lv-attn-ink); }
+  .lv-warn   { background:var(--lv-warn);    color:var(--lv-warn-ink); }
+  .lv-alarm  { background:var(--lv-alarm);   color:var(--lv-alarm-ink); }
+  .lv-serious{ background:var(--lv-serious); color:var(--lv-serious-ink); }
+  .lv-unknown{ background:var(--surface-3);  color:var(--ink-muted); }
+
+  .layer-toggle{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .layer-toggle button{
+    all:unset; cursor:pointer; font-size:11px; padding:4px 9px; border-radius:7px;
+    border:1px solid var(--border); color:var(--ink-secondary); background:var(--surface-2);
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .layer-toggle button i{ width:9px; height:9px; border-radius:50%; flex-shrink:0;
+    background:var(--ink-muted); display:inline-block; }
+  .layer-toggle button[aria-pressed="true"]{
+    background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:600;
+  }
+  .layer-toggle button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .lt-algae  i{ background:#b8381a; }
+  .lt-wl     i{ background:var(--seq-500); }
+  .lt-rain   i{ background:#5aa9d6; }
+
+  .rt-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin:-4px 0 14px; }
+  .rt-stamp{ font-size:11px; color:var(--ink-muted); }
+  .rt-block + .rt-block{ margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
+  .rt-block-title{ font-size:11.5px; font-weight:700; color:var(--ink-primary); margin-bottom:2px; }
+  .rt-block-sub{ font-size:10.5px; color:var(--ink-muted); margin-bottom:9px; line-height:1.5; }
+  .rt-rows{ display:flex; flex-direction:column; gap:1px; }
+  .rt-row{ display:flex; align-items:center; gap:9px; padding:5px 4px; border-radius:7px; font-size:12.5px; }
+  .rt-row.clickable{ all:unset; cursor:pointer; display:flex; align-items:center; gap:9px;
+    padding:5px 4px; border-radius:7px; font-size:12.5px; }
+  .rt-row.clickable:hover{ background:var(--surface-3); }
+  .rt-row.clickable:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .rt-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rt-sub{ color:var(--ink-muted); font-size:10.5px; }
+  .rt-val{ flex-shrink:0; font-weight:600; text-align:right; }
+
+  .rt-tally{ display:flex; gap:5px; flex-wrap:wrap; }
+  .rt-tally .tally{
+    flex:1 1 0; min-width:54px; text-align:center; border-radius:9px; padding:7px 4px;
+    border:1px solid var(--border); background:var(--surface-2);
+  }
+  .rt-tally .tally b{ display:block; font-family:"JetBrains Mono",monospace; font-size:17px; font-weight:600; }
+  .rt-tally .tally span{ font-size:10px; color:var(--ink-muted); }
+  .rt-tally .tally.hit{ border-width:2px; }
+
+  .rt-empty{ font-size:12px; color:var(--ink-secondary); background:var(--surface-3);
+    border-radius:8px; padding:9px 11px; line-height:1.55; }
+  .rt-fail{ font-size:12px; color:var(--status-ink); background:var(--status-soft);
+    border:1px solid var(--status); border-radius:8px; padding:9px 11px; line-height:1.55; }
+
+  .rt-mark{ stroke:#f4fbf9; stroke-width:1.6; }
+  .rt-mark-rain{ fill:#5aa9d6; fill-opacity:.42; stroke:#eaf6fc; stroke-width:1.2; }
+  .rt-mark-hit{ fill:transparent; }
+  .rt-algae-label{ font-size:11px; font-weight:700; fill:var(--ink-primary); }
+  .rt-algae-halo{ fill:none; stroke:var(--surface-2); stroke-width:3.2; stroke-linejoin:round; }
+
   @media (max-width: 760px){
     .layout{ flex-direction:column; }
     .map-panel{ width:100%; }
@@ -254,7 +332,8 @@
       <div class="mstat"><b class="mono">268km</b><span>하구둑~영강합류부</span></div>
       <div class="mstat"><b class="mono">1,340</b><span>구간(200m)</span></div>
       <div class="mstat"><b class="mono">8</b><span>보(가동보)</span></div>
-      <div class="mstat"><b class="mono">2019-25</b><span>관측기간</span></div>
+      <div class="mstat"><b class="mono">2019-25</b><span>위성 관측기간</span></div>
+      <div class="mstat"><b class="mono" id="mstatLive">–</b><span>실시간 수집</span></div>
     </div>
   </div>
 </div>
@@ -307,6 +386,12 @@
       </div>
       <p class="daily-note" id="dailyNote">일별 값은 반복빈도가 아니라 그날 하루 위성 관측의 화소별 초과비율입니다(구름 등으로 결측 많음).</p>
 
+      <div class="layer-toggle" role="group" aria-label="실시간 관측 레이어">
+        <button class="lt-algae" id="ltAlgae" aria-pressed="true"><i></i>조류경보 지점</button>
+        <button class="lt-wl" id="ltWl" aria-pressed="true"><i></i>수위 기준초과</button>
+        <button class="lt-rain" id="ltRain" aria-pressed="false"><i></i>24시간 강수</button>
+      </div>
+
       <div class="map-stage" id="mapStage">
         <div class="zoom-tools">
           <button id="zoomInBtn" aria-label="확대" title="확대">+</button>
@@ -333,6 +418,12 @@
           <div class="stat"><b class="mono" id="nowMean">-</b><span>구간 평균 빈도(%)</span></div>
           <div class="stat"><b class="mono" id="nowNdate">-</b><span>관측일수</span></div>
         </div>
+      </div>
+
+      <div class="card" id="rtCard">
+        <h2>실시간 현황 <span class="card-sub">(공공API 자동수집 · 매시간)</span></h2>
+        <div class="rt-head"><span class="rt-stamp" id="rtStamp">불러오는 중…</span></div>
+        <div id="rtBody"></div>
       </div>
 
       <div class="side-grid">
@@ -392,6 +483,14 @@
     구간이 채색된 선은 실제 하폭이 아니라 위치 표시용입니다 ·
     위성 배경사진은 Microsoft Planetary Computer(Sentinel-2 L2A TCI, 2024년 저운량 6장면 모자이크,
     타일마다 촬영일이 달라 특정 단일 시점 아님, 참고용)
+    <br><br>
+    실시간 항목 — 수위·강수: 한강홍수통제소(HRFCO) Open API / 조류경보: 공공데이터포털
+    국립환경과학원 조류경보제 조회서비스 ·
+    <b>위험등급은 기관이 공표한 기준값과의 단순 비교</b>입니다(관심·주의·경계·심각 기준수위,
+    조류경보 관심 1,000 / 경계 10,000 / 대발생 1,000,000 cells/mL) — 자체 위험도 모형이 아니며
+    강수량으로 홍수를 예측하지 않습니다 ·
+    실시간 값은 국내에서 매시간 수집해 저장소에 반영되므로 수집 시각과 현재 시각에 차이가 있을 수 있습니다
+    (각 항목의 수집 시각 표기 참조)
   </footer>
 </div>
 
@@ -725,7 +824,12 @@ mapSvg.addEventListener("mouseleave", ()=> tip.hidden = true);
 
 // ---- 확대/축소 · 드래그 이동 (viewBox 기반) ----
 let vb = {x:0, y:0, w:MAP_W, h:MAP_H};
-function applyVB(){ mapSvg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function applyVB(){
+  mapSvg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  // 실시간 마커는 화면상 크기를 일정하게 유지해야 하므로 확대배율의 역수로 되돌린다
+  if(typeof onViewBoxChange === "function") onViewBoxChange();
+}
+let onViewBoxChange = null;
 function clientToUser(clientX, clientY){
   const pt = mapSvg.createSVGPoint();
   pt.x = clientX; pt.y = clientY;
@@ -847,4 +951,407 @@ const poolRankList = document.getElementById("poolRankList");
 }
 
 render(0);
+
+/* =========================================================================
+   실시간 레이어 — data/*.json (국내에서 매시간 수집해 커밋된 공공API 결과)
+   ========================================================================= */
+
+// ---- 위경도 → EPSG:5186 → SVG 좌표 ----
+// EPSG:5186 (Korea 2000 / Central Belt 2010): tmerc, lat_0=38, lon_0=127, k=1,
+// x_0=200000, y_0=600000, GRS80. 아래 전방 TM 식은 pyproj와 최대 0.04mm(≈3e-7 px)
+// 이내로 일치하는 것을 연구범위 12개 검정점에서 확인했다(build/좌표검증.py).
+const TM = (()=>{
+  const A = 6378137.0, FL = 1/298.257222101;
+  const E2 = 2*FL - FL*FL, EP2 = E2/(1-E2);
+  const LAT0 = 38*Math.PI/180, LON0 = 127*Math.PI/180;
+  const X0 = 200000, Y0 = 600000;
+  function M(phi){
+    return A*((1 - E2/4 - 3*E2**2/64 - 5*E2**3/256)*phi
+            - (3*E2/8 + 3*E2**2/32 + 45*E2**3/1024)*Math.sin(2*phi)
+            + (15*E2**2/256 + 45*E2**3/1024)*Math.sin(4*phi)
+            - (35*E2**3/3072)*Math.sin(6*phi));
+  }
+  const M0 = M(LAT0);
+  return function(lon, lat){
+    const phi = lat*Math.PI/180, lam = lon*Math.PI/180;
+    const sinp = Math.sin(phi), cosp = Math.cos(phi), tanp = Math.tan(phi);
+    const N = A/Math.sqrt(1 - E2*sinp*sinp);
+    const T = tanp*tanp, C = EP2*cosp*cosp, a = (lam - LON0)*cosp;
+    const x = X0 + N*(a + (1 - T + C)*a**3/6
+                      + (5 - 18*T + T*T + 72*C - 58*EP2)*a**5/120);
+    const y = Y0 + (M(phi) - M0 + N*tanp*(a*a/2
+                      + (5 - T + 9*C + 4*C*C)*a**4/24
+                      + (61 - 58*T + T*T + 600*C - 330*EP2)*a**6/720));
+    return [x, y];
+  };
+})();
+
+function lonLatToSvg(lon, lat){
+  const [x, y] = TM(lon, lat);
+  const sx = (x - DATA.MINX)/(DATA.MAXX - DATA.MINX)*DATA.W*(1 - 2*DATA.PAD) + DATA.W*DATA.PAD;
+  const sy = (DATA.MAXY - y)/(DATA.MAXY - DATA.MINY)*DATA.H*(1 - 2*DATA.PAD) + DATA.H*DATA.PAD;
+  return [sx, sy];
+}
+function inMapBounds(sx, sy){
+  return sx >= 0 && sx <= DATA.W && sy >= 0 && sy <= DATA.H;
+}
+
+// ---- 등급 → 배지 (기관이 공표한 등급명을 그대로 쓴다) ----
+const LV_CLASS = {"정상":"lv-normal","관심":"lv-attn","주의":"lv-warn",
+                  "경계":"lv-alarm","심각":"lv-serious","대발생":"lv-serious"};
+const LV_FILL  = {"정상":"#7e8984","관심":"#ffd95a","주의":"#e68920",
+                  "경계":"#b8381a","심각":"#6e040b","대발생":"#6e040b"};
+const LV_ORDER = ["정상","관심","주의","경계","심각"];
+const ALGAE_ORDER = ["정상","관심","경계","대발생"];
+// 색만으로 등급을 전달하지 않도록 배지에 등급별 도형 아이콘을 함께 넣는다
+const LV_ICON = {
+  "정상":'<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  "관심":'<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.4" fill="currentColor"/></svg>',
+  "주의":'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.4 L11 10.6 H1 Z" fill="currentColor"/></svg>',
+  "경계":'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.4 L11 10.6 H1 Z" fill="currentColor"/></svg>',
+  "심각":'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.8 1h4.4L11 3.8v4.4L8.2 11H3.8L1 8.2V3.8Z" fill="currentColor"/></svg>',
+  "대발생":'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.8 1h4.4L11 3.8v4.4L8.2 11H3.8L1 8.2V3.8Z" fill="currentColor"/></svg>',
+};
+function badge(level){
+  if(!level) return `<span class="lv-badge lv-unknown">기준없음</span>`;
+  return `<span class="lv-badge ${LV_CLASS[level]||"lv-unknown"}">${LV_ICON[level]||""}${level}</span>`;
+}
+function fmtStamp(iso){
+  const d = new Date(iso);
+  if(!iso || isNaN(d)) return "–";
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtObsTime(ymdhm){   // "202609111600" → "09.11 16:00"
+  const s = String(ymdhm || "");
+  if(s.length < 12) return "–";
+  return `${s.slice(4,6)}.${s.slice(6,8)} ${s.slice(8,10)}:${s.slice(10,12)}`;
+}
+
+// ---- 조류경보 4개 지점 위치 ----
+// 조류경보 원자료(08d)의 SWMN_DETAIL_NM 에 기관이 적어둔 "○○보 상류 N km" 를
+// 04_구조물.csv 의 보 종단거리(dfe_km)에 더해 구한 값. 위경도를 임의로 넣지 않는다.
+// 산출근거와 역투영 검산은 build/지점위치산출.py 참조.
+//   해평     = 칠곡보 191.38 + 22 = 213.38   (역투영 128.369,36.190 ↔ 구미 해평면)
+//   강정고령 = 강정고령보 165.91 + 7 = 172.91
+//   칠서     = 창녕함안보 74.14 + 12 = 86.14
+//   물금매리 = 보 기준 거리가 원자료에 없어 인접 지류인 양산천 합류부(20.92)로 근사
+const ALGAE_PTS = [
+  {name:"해평",     s:213.38, approx:false, basis:"칠곡보 상류 22km"},
+  {name:"강정고령", s:172.91, approx:false, basis:"강정고령보 상류 7km"},
+  {name:"칠서",     s:86.14,  approx:false, basis:"창녕함안보 상류 12km"},
+  {name:"물금매리", s:20.92,  approx:true,  basis:"양산천 합류부 기준 근사"},
+];
+// s(km) 에 가장 가까운 구간의 화면좌표를 쓴다 — 구간은 200m 간격이므로 오차는 100m 이내
+function svgForS(sKm){
+  let best = null, bestD = Infinity;
+  for(const seg of segs){
+    const d = Math.abs(seg.s - sKm);
+    if(d < bestD){ bestD = d; best = seg; }
+  }
+  return best ? {x: SX(best.x), y: SY(best.y), d: bestD} : null;
+}
+
+// ---- 마커 레이어 ----
+const rtG = document.createElementNS(svgNS, "g");
+rtG.setAttribute("id", "rtLayers");
+rotG.appendChild(rtG);            // 구간선·보 표시 위에 얹는다
+const gRain  = document.createElementNS(svgNS, "g"); rtG.appendChild(gRain);
+const gWl    = document.createElementNS(svgNS, "g"); rtG.appendChild(gWl);
+const gAlgae = document.createElementNS(svgNS, "g"); rtG.appendChild(gAlgae);
+
+const markerGroups = [];   // 확대해도 화면상 크기를 유지하려고 따로 보관
+function addMarker(parent, sx, sy, innerHTML, tipHTML, onClick){
+  const g = document.createElementNS(svgNS, "g");
+  g.setAttribute("transform", `translate(${sx},${sy})`);
+  g.innerHTML = innerHTML;
+  if(tipHTML) g.querySelectorAll(".rt-hit").forEach(h => h.dataset.tip = tipHTML);
+  if(onClick){ g.style.cursor = "pointer"; g.addEventListener("click", onClick); }
+  parent.appendChild(g);
+  markerGroups.push({el:g, x:sx, y:sy});
+}
+onViewBoxChange = function(){
+  const k = vb.w / MAP_W;       // 1 = 전체보기, 작아질수록 확대
+  for(const m of markerGroups){
+    m.el.setAttribute("transform", `translate(${m.x},${m.y}) scale(${k})`);
+  }
+};
+
+function panToSvg(cx, cy, widthFrac){
+  const newW = MAP_W * (widthFrac || 0.18), newH = newW * (MAP_H/MAP_W);
+  vb = {x: cx - newW/2, y: cy - newH/2, w: newW, h: newH};
+  applyVB();
+}
+
+// 마커 툴팁 — 기존 구간 툴팁 핸들러보다 뒤에 등록되므로 rt 마커 위에서는 이쪽이 최종 상태가 된다
+mapSvg.addEventListener("mousemove", (e)=>{
+  if(dragging) return;
+  const hit = e.target.closest ? e.target.closest(".rt-hit") : null;
+  if(hit && hit.dataset.tip){
+    tip.innerHTML = hit.dataset.tip;
+    tip.style.left = e.clientX+"px";
+    tip.style.top = e.clientY+"px";
+    tip.hidden = false;
+  }
+});
+
+// ---- 데이터 로드 ----
+const RT_FILES = {
+  algae:      "data/algae_latest.json",
+  waterlevel: "data/hrfco_waterlevel.json",
+  rainfall:   "data/hrfco_rainfall.json",
+  fldfct:     "data/hrfco_fldfct.json",
+};
+async function loadJson(path){
+  const r = await fetch(path, {cache:"no-store"});
+  if(!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+  return r.json();
+}
+(async function initRealtime(){
+  const keys = Object.keys(RT_FILES);
+  const results = await Promise.allSettled(keys.map(k => loadJson(RT_FILES[k])));
+  const RT = {}, failed = [];
+  results.forEach((res, i)=>{
+    if(res.status === "fulfilled") RT[keys[i]] = res.value;
+    else { RT[keys[i]] = null; failed.push(keys[i]); }
+  });
+  renderRealtime(RT, failed, keys.length);
+})();
+
+function renderRealtime(RT, failed, nTotal){
+  const body = document.getElementById("rtBody");
+  const stampEl = document.getElementById("rtStamp");
+
+  if(failed.length === nTotal){
+    stampEl.textContent = "";
+    body.innerHTML = `<div class="rt-fail">실시간 데이터를 불러오지 못했습니다.
+      이 페이지를 웹주소가 아니라 파일로 직접 열면 <code>data/</code> 를 읽을 수 없습니다 —
+      공개 주소에서 열어주세요.</div>`;
+    return;
+  }
+
+  // 가장 늦은 수집시각을 대표로 표기 (항목별 시각은 각 블록에 따로 적는다)
+  const stamps = ["waterlevel","rainfall","algae"]
+    .map(k => RT[k] && RT[k].updated_at).filter(Boolean).sort();
+  const last = stamps.length ? stamps[stamps.length-1] : null;
+  stampEl.textContent = last ? `최근 수집 ${fmtStamp(last)}` : "";
+  if(last){
+    const d = new Date(last);
+    const p = n => String(n).padStart(2,"0");
+    document.getElementById("mstatLive").textContent =
+      isNaN(d) ? "–" : `${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}시`;
+  }
+
+  let html = blockAlgae(RT.algae) + blockWaterlevel(RT.waterlevel, RT.fldfct)
+           + blockRainfall(RT.rainfall);
+  if(failed.length){
+    html += `<div class="rt-block"><div class="rt-fail">일부 항목을 불러오지 못했습니다:
+      ${failed.join(", ")}</div></div>`;
+  }
+  body.innerHTML = html;
+
+  drawAlgaeMarkers(RT.algae);
+  drawWaterlevelMarkers(RT.waterlevel);
+  drawRainfallMarkers(RT.rainfall);
+  wireRowClicks();
+  wireLayerToggles(RT);
+  onViewBoxChange();
+}
+
+/* ---- 블록 1: 조류경보제 ---- */
+function blockAlgae(A){
+  if(!A) return "";
+  const rows = (A.rows||[]).filter(r => r.level);
+  const worstIdx = rows.reduce((acc,r)=> Math.max(acc, ALGAE_ORDER.indexOf(r.level)), -1);
+  const worst = worstIdx >= 0 ? ALGAE_ORDER[worstIdx] : null;
+  let h = `<div class="rt-block">
+    <div class="rt-block-title">조류경보제 ${worst ? badge(worst) : ""}</div>
+    <div class="rt-block-sub">국립환경과학원 공식 발령 기준(유해남조류 세포수) —
+      관심 1,000 / 경계 10,000 / 대발생 1,000,000 cells/mL, 2회 연속 초과.
+      지점 위치는 종단거리(s) 기준이며 <b>*</b> 표시는 인접 측정소 기준 근사.</div>
+    <div class="rt-rows">`;
+  if(!rows.length){
+    h += `<div class="rt-empty">수집된 지점이 없습니다.</div>`;
+  } else {
+    ALGAE_PTS.forEach(pt=>{
+      const r = rows.find(x=>x.station===pt.name);
+      if(!r) return;
+      const p = svgForS(pt.s);
+      h += `<button class="rt-row clickable" data-x="${p?p.x:""}" data-y="${p?p.y:""}" data-frac="0.10">
+        <span class="rt-name">${r.station}${pt.approx?'<span class="rt-sub">*</span>':""}
+          <span class="rt-sub">· 채수 ${r.date||"–"}${r.pending?` · ${r.pending_date} 분석중`:""}</span></span>
+        <span class="rt-val mono">${r.cell_count===null?"–":Math.round(r.cell_count).toLocaleString()}</span>
+        ${badge(r.level)}
+      </button>`;
+    });
+  }
+  h += `</div></div>`;
+  return h;
+}
+
+/* ---- 블록 2: 수위 · 기준수위까지의 여유 ---- */
+function blockWaterlevel(W, F){
+  if(!W) return "";
+  const rows = (W.rows||[]).filter(r=>r.risk_judgeable);
+  const tally = {};
+  LV_ORDER.forEach(l => tally[l] = 0);
+  rows.forEach(r => { if(tally[r.risk_level] !== undefined) tally[r.risk_level]++; });
+
+  // 여유 = (유효한 가장 낮은 기준수위) − 현재수위. 공표값의 차이일 뿐 자체 위험도 모형이 아니다.
+  const withMargin = rows.map(r=>{
+    const ths = [r.attwl, r.wrnwl, r.almwl, r.srswl].filter(v => v !== null && v > 0);
+    if(!ths.length || r.latest_wl === null) return null;
+    const lowest = Math.min(...ths);
+    return {...r, margin: +(lowest - r.latest_wl).toFixed(2), lowest};
+  }).filter(Boolean).sort((a,b)=>a.margin-b.margin).slice(0,6);
+
+  const alerts = (F && F.rows) ? F.rows.length : 0;
+  let h = `<div class="rt-block">
+    <div class="rt-block-title">수위 · 홍수 위험</div>
+    <div class="rt-block-sub">관측 ${W.n}개소 중 기준수위가 공표돼 판정 가능한 ${rows.length}개소 ·
+      관측시각 ${fmtObsTime((rows[0]||{}).latest_time)} · 홍수예보 발령 ${alerts}건</div>
+    <div class="rt-tally">`;
+  LV_ORDER.forEach(l=>{
+    const n = tally[l], hit = n > 0 && l !== "정상";
+    h += `<div class="tally${hit ? " hit" : ""}"${hit ? ` style="border-color:${LV_FILL[l]}"` : ""}>
+      <b>${n}</b><span>${l}</span></div>`;
+  });
+  h += `</div>
+    <div class="rt-block-sub" style="margin:12px 0 6px">
+      관심수위까지 남은 여유가 가장 적은 지점 (공표 기준수위 − 현재수위, m)</div>
+    <div class="rt-rows">`;
+  withMargin.forEach(r=>{
+    const p = (r.lon !== null && r.lat !== null) ? lonLatToSvg(r.lon, r.lat) : null;
+    h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}" data-frac="0.14">
+      <span class="rt-name">${r.name}
+        <span class="rt-sub">· 현재 ${r.latest_wl}m / 기준 ${r.lowest}m</span></span>
+      <span class="rt-val mono"${r.margin<=0 ? ` style="color:${LV_FILL["경계"]}"` : ""}>${
+        (r.margin>0?"+":"") + r.margin.toFixed(2)}</span>
+      ${badge(r.risk_level)}
+    </button>`;
+  });
+  h += `</div></div>`;
+  return h;
+}
+
+/* ---- 블록 3: 강수 ---- */
+function blockRainfall(R){
+  if(!R) return "";
+  const rows = (R.rows||[]).filter(r=>r.sum_24h_mm !== null);
+  const wet = rows.filter(r=>r.sum_24h_mm > 0).sort((a,b)=>b.sum_24h_mm-a.sum_24h_mm);
+  const maxMm = wet.length ? wet[0].sum_24h_mm : 0;
+  let h = `<div class="rt-block">
+    <div class="rt-block-title">강수 (24시간 누적)</div>
+    <div class="rt-block-sub">유역 ${rows.length}개소 ·
+      관측시각 ${fmtObsTime((rows[0]||{}).latest_time)} · 최대 ${maxMm.toFixed(1)}mm</div>`;
+  if(!wet.length){
+    h += `<div class="rt-empty">최근 24시간 강수가 관측된 지점이 없습니다(무강우).
+      비가 오면 이 목록과 지도의 강수 레이어에 표시됩니다.</div>`;
+  } else {
+    h += `<div class="rt-rows">`;
+    wet.slice(0,6).forEach(r=>{
+      const p = (r.lon !== null && r.lat !== null) ? lonLatToSvg(r.lon, r.lat) : null;
+      h += `<button class="rt-row clickable" data-x="${p?p[0]:""}" data-y="${p?p[1]:""}" data-frac="0.14">
+        <span class="rt-name">${r.name}
+          <span class="rt-sub">· 직전 1시간 ${r.latest_1h_mm===null?"–":r.latest_1h_mm+"mm"}</span></span>
+        <span class="rt-val mono">${r.sum_24h_mm.toFixed(1)}mm</span>
+      </button>`;
+    });
+    h += `</div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ---- 마커 그리기 ---- */
+function drawAlgaeMarkers(A){
+  if(!A) return;
+  (A.rows||[]).forEach(r=>{
+    const pt = ALGAE_PTS.find(p=>p.name===r.station);
+    if(!pt || !r.level) return;
+    const p = svgForS(pt.s);
+    if(!p) return;
+    const sx = p.x, sy = p.y;
+    const tipHTML = `<b>${r.station}</b>${pt.approx?" (위치 근사)":""}<br>조류경보 ${r.level}<br>`
+      + `유해남조류 ${r.cell_count===null?"–":Math.round(r.cell_count).toLocaleString()} cells/mL<br>`
+      + `채수일 ${r.date||"–"}<br>위치: ${pt.basis} (s=${pt.s}km)`;
+    addMarker(gAlgae, sx, sy, `
+      <circle class="rt-hit rt-mark-hit" cx="0" cy="0" r="13"></circle>
+      <path class="rt-mark" d="M0,-8 L8,0 L0,8 L-8,0 Z" fill="${LV_FILL[r.level]||"#7e8984"}"></path>
+      <text class="rt-algae-label rt-algae-halo" x="11" y="4">${r.station}</text>
+      <text class="rt-algae-label" x="11" y="4">${r.station}</text>
+    `, tipHTML, ()=> panToSvg(sx, sy, 0.10));
+  });
+}
+function drawWaterlevelMarkers(W){
+  if(!W) return;
+  (W.rows||[]).forEach(r=>{
+    if(!r.risk_judgeable || r.lon === null || r.lat === null) return;
+    const [sx, sy] = lonLatToSvg(r.lon, r.lat);
+    if(!inMapBounds(sx, sy)) return;
+    // 정상 지점은 관측망 배경으로만 읽히게 작고 옅게, 기준초과 지점만 크게 강조한다
+    const elevated = r.risk_level && r.risk_level !== "정상";
+    const rad = elevated ? 6 : 2.2;
+    const tipHTML = `<b>${r.name}</b><br>수위 ${r.latest_wl===null?"–":r.latest_wl+"m"} · ${r.risk_level}<br>`
+      + `기준 관심 ${r.attwl||"–"} / 주의 ${r.wrnwl||"–"} / 경계 ${r.almwl||"–"} / 심각 ${r.srswl||"–"}<br>`
+      + fmtObsTime(r.latest_time);
+    // 정상 지점의 히트영역을 크게 잡으면 191개가 구간선 위를 덮어 구간 툴팁을 가린다 —
+    // 기준초과 지점만 넉넉하게, 정상은 마커 크기만큼만 잡는다.
+    addMarker(gWl, sx, sy, `
+      <circle class="rt-hit rt-mark-hit" cx="0" cy="0" r="${elevated ? rad+5 : rad+2}"></circle>
+      <circle class="rt-mark" cx="0" cy="0" r="${rad}" fill="${LV_FILL[r.risk_level]||"#7e8984"}"
+              ${elevated ? "" : 'stroke-width="0.8" opacity="0.72"'}></circle>
+    `, tipHTML, null);
+  });
+}
+function drawRainfallMarkers(R){
+  if(!R) return;
+  // 버블 반지름은 면적이 강수량에 비례하도록 √ 스케일 (반지름 비례는 양을 과장한다)
+  const rows = (R.rows||[]).filter(r=>r.sum_24h_mm > 0 && r.lon !== null);
+  const maxMm = rows.reduce((m,r)=>Math.max(m, r.sum_24h_mm), 0) || 1;
+  rows.forEach(r=>{
+    const [sx, sy] = lonLatToSvg(r.lon, r.lat);
+    if(!inMapBounds(sx, sy)) return;
+    const rad = 3 + 13*Math.sqrt(r.sum_24h_mm/maxMm);
+    const tipHTML = `<b>${r.name}</b><br>24시간 ${r.sum_24h_mm.toFixed(1)}mm<br>`
+      + `직전 1시간 ${r.latest_1h_mm===null?"–":r.latest_1h_mm+"mm"}<br>${fmtObsTime(r.latest_time)}`;
+    addMarker(gRain, sx, sy, `
+      <circle class="rt-hit rt-mark-hit" cx="0" cy="0" r="${rad+4}"></circle>
+      <circle class="rt-mark-rain" cx="0" cy="0" r="${rad}"></circle>
+    `, tipHTML, null);
+  });
+}
+
+/* ---- 목록 클릭 → 지도 이동 ---- */
+function wireRowClicks(){
+  document.querySelectorAll("#rtBody .rt-row.clickable").forEach(btn=>{
+    const x = parseFloat(btn.dataset.x), y = parseFloat(btn.dataset.y);
+    if(isNaN(x) || isNaN(y)){ btn.classList.remove("clickable"); return; }
+    btn.addEventListener("click", ()=> panToSvg(x, y, parseFloat(btn.dataset.frac)));
+  });
+}
+
+/* ---- 레이어 on/off ---- */
+function wireLayerToggles(RT){
+  // 관측소 수를 버튼 라벨에 넣어 레이어가 비어 있는지 바로 알 수 있게 한다
+  const wlN   = RT.waterlevel ? (RT.waterlevel.rows||[]).filter(r=>r.risk_judgeable).length : 0;
+  const rainN = RT.rainfall   ? (RT.rainfall.rows||[]).filter(r=>r.sum_24h_mm > 0).length : 0;
+  const algN  = RT.algae      ? (RT.algae.rows||[]).filter(r=>r.level).length : 0;
+  document.getElementById("ltAlgae").innerHTML = `<i></i>조류경보 지점 (${algN})`;
+  document.getElementById("ltWl").innerHTML    = `<i></i>수위 관측소 (${wlN})`;
+  document.getElementById("ltRain").innerHTML  = `<i></i>24시간 강수 (${rainN})`;
+
+  [["ltAlgae", gAlgae, true], ["ltWl", gWl, true], ["ltRain", gRain, false]]
+  .forEach(([id, g, initial])=>{
+    const btn = document.getElementById(id);
+    let on = initial;
+    const apply = ()=>{
+      g.style.display = on ? "" : "none";
+      btn.setAttribute("aria-pressed", String(on));
+    };
+    apply();
+    btn.addEventListener("click", ()=>{ on = !on; apply(); });
+  });
+  const btnRain = document.getElementById("ltRain");
+  if(rainN === 0){ btnRain.disabled = true; btnRain.style.opacity = .45; btnRain.title = "현재 무강우"; }
+}
 </script>
