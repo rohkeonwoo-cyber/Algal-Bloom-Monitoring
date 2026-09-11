@@ -9,6 +9,9 @@
  "encoding": "rgb16",
  "elev_scale": 0.1,
  "depth_scale": 0.01,
+ "dist_file": "dist.png",
+ "dist_scale": 1.0,
+ "dist_max_m": 15000,
  "bounds_5186": [
   308701.7315047632,
   297368.8538616505,

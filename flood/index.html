@@ -119,6 +119,11 @@
     <span class="val mono" id="vexVal">3×</span>
   </div>
   <div class="ctl">
+    <label for="dlim">본류 거리</label>
+    <input type="range" id="dlim" min="1" max="15" step="1" value="15">
+    <span class="val mono" id="dlimVal">15km</span>
+  </div>
+  <div class="ctl">
     <label for="opa">물 투명도</label>
     <input type="range" id="opa" min="30" max="100" step="5" value="80">
     <span class="val mono" id="opaVal">80</span>
@@ -186,8 +191,8 @@ function decodeRGB16(img){
   return {w:c.width, h:c.height, v:out};
 }
 
-let META, TERR, DEPTHS = {}, scene, camera, renderer, terrainMesh, waterMesh, group;
-let vex = 3, waterOpacity = 0.8, current = null;
+let META, TERR, DIST = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, waterMesh, group;
+let vex = 3, waterOpacity = 0.8, current = null, distLimit = Infinity;
 
 (async function init(){
   let meta;
@@ -206,6 +211,7 @@ let vex = 3, waterOpacity = 0.8, current = null;
   try{
     terrainImg = await loadImage("terrain.png"); step("지형 격자 해석 중…");
     if(meta.texture){ texImg = await loadImage(meta.texture.file); step("위성영상 적용 중…"); }
+    if(meta.dist_file){ DIST = decodeRGB16(await loadImage(meta.dist_file)); }
     for(const s of meta.scenarios){
       DEPTHS[s.key] = decodeRGB16(await loadImage(s.file));
       step(`침수 시나리오 ${s.label} 읽는 중…`);
@@ -307,6 +313,9 @@ function buildWater(key){
       const i = r * w + c;
       const d = D.v[i] * scale;
       if(d <= 0) continue;
+      // 본류에서 먼 지류 골짜기는 배수위 감쇠를 반영하지 않아 과대표시된다.
+      // 임의 감쇠 모형을 끼워넣는 대신, 보이는 범위를 직접 자를 수 있게 한다.
+      if(DIST && DIST.v[i] * (META.dist_scale || 1) > distLimit) continue;
       idxOf[i] = verts.length / 3;
       verts.push(x0 + c * res, elevAt(i) + d, z0 + r * res);
       const col = colorFor(d);
@@ -415,6 +424,18 @@ function buildUI(meta){
     el("vexVal").textContent = vex + "×";
     if(group) group.scale.y = vex;
   });
+  const dl = el("dlim");
+  if(meta.dist_file){
+    dl.max = Math.round((meta.dist_max_m || 15000) / 1000);
+    dl.value = dl.max;
+    el("dlimVal").textContent = dl.max + "km";
+    dl.addEventListener("input", e=>{
+      const km = +e.target.value;
+      distLimit = km * 1000;
+      el("dlimVal").textContent = km + "km";
+      if(current) buildWater(current);
+    });
+  } else { dl.disabled = true; dl.parentElement.style.opacity = .45; }
   el("opa").addEventListener("input", e=>{
     waterOpacity = +e.target.value / 100;
     el("opaVal").textContent = e.target.value;
@@ -460,7 +481,8 @@ function select(key){
     특정 지점의 침수 여부 판정에는 쓸 수 없는 <b>지형 기반 근사</b>입니다.<br><br>
     특히 <b>지류 골짜기 안쪽까지 물이 차 보이는 것</b>은 모든 지점에 가장 가까운 본류 수면표고를
     그대로 적용했기 때문입니다. 실제로는 합류부에서 멀어질수록 배수위 영향이 줄어들므로,
-    본류에서 먼 골짜기의 침수는 과대표시입니다.`;
+    본류에서 먼 골짜기의 침수는 과대표시입니다 —
+    <b>'본류 거리' 슬라이더</b>로 표시 범위를 좁혀 확인해 보세요.`;
 }
 })();
 </script>
