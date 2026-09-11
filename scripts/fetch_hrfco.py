@@ -93,18 +93,26 @@ def fetch_waterlevel():
         att, wrn, alm, srs = (_f(s.get("attwl")), _f(s.get("wrnwl")),
                                _f(s.get("almwl")), _f(s.get("srswl")))
         level, judgeable = risk_level(wl, att, wrn, alm, srs)
+        t0, series = _hourly_series(obs, "wl")
+        gdt = _f(s.get("gdt"))
         rows.append({
             "code": code, "name": s.get("obsnm"), "addr": s.get("addr"),
             "lon": dms_to_deg(s.get("lon")), "lat": dms_to_deg(s.get("lat")),
             # 공식 기준수위: 관심/주의/경계/심각 + 계획홍수위
             "attwl": att, "wrnwl": wrn, "almwl": alm, "srswl": srs,
             "pfh": _f(s.get("pfh")),
+            # gdt = 수위표 영점표고. 관측수위·기준수위 모두 수위표 기준이므로
+            # 해발표고(EL.m) = 값 + gdt. 침수범위 계산에 반드시 필요하다.
+            "gdt": gdt,
             "is_forecast_point": s.get("fstnyn") == "Y",
             "latest_time": latest.get("ymdhm") if latest else None,
             "latest_wl": wl,
             "latest_fw": _f(latest.get("fw")) if latest else None,
             "risk_level": level,          # 정상/관심/주의/경계/심각 (기준수위 없으면 null)
             "risk_judgeable": judgeable,  # 기준수위가 유효해 판정 가능한 지점인지
+            # 최근 30시간 정시 시계열 — API가 이미 주는 자료라 추가 호출이 없다.
+            "series_t0": t0, "series": series,
+            "delta_24h": _delta(series, 24),
         })
         time.sleep(SLEEP)
     n_judge = sum(1 for r in rows if r["risk_judgeable"])
@@ -127,12 +135,14 @@ def fetch_rainfall():
             continue
         recent = _sort_by_time(obs)[-24:] if obs else []
         sum24h = sum(_f(o.get("rf")) or 0 for o in recent)
+        t0, series = _hourly_series(obs, "rf")
         rows.append({
             "code": code, "name": s.get("obsnm"), "addr": s.get("addr"),
             "lon": dms_to_deg(s.get("lon")), "lat": dms_to_deg(s.get("lat")),
             "latest_time": recent[-1].get("ymdhm") if recent else None,
             "latest_1h_mm": _f(recent[-1].get("rf")) if recent else None,
             "sum_24h_mm": round(sum24h, 1),
+            "series_t0": t0, "series": series,   # 시간강수량(mm/h), 추가 호출 없음
         })
         time.sleep(SLEEP)
     _save("hrfco_rainfall.json", rows)
@@ -153,6 +163,36 @@ def fetch_fldfct():
 def _sort_by_time(obs):
     """ymdhm 오름차순 정렬 — 마지막 원소가 항상 최신이 되도록."""
     return sorted(obs, key=lambda o: str(o.get("ymdhm") or ""))
+
+
+def _hourly_series(obs, field, hours=30):
+    """정시 격자에 맞춘 시계열 배열을 만든다.
+
+    1H 자료의 ymdhm 은 12자리가 아니라 **10자리(YYYYMMDDHH)** 로 온다.
+    관측이 빠진 시각은 None 으로 채워, 배열 인덱스가 곧 시각이 되게 한다
+    (그래야 프런트에서 t0 하나만 알고 x축을 그릴 수 있다).
+    반환: (t0, [값 또는 None, ...])  — 관측이 없으면 (None, [])
+    """
+    if not obs:
+        return None, []
+    now = datetime.now(timezone(timedelta(hours=9))).replace(minute=0, second=0, microsecond=0)
+    grid = [(now - timedelta(hours=h)).strftime("%Y%m%d%H") for h in range(hours, -1, -1)]
+    by_hour = {str(o.get("ymdhm") or "")[:10]: _f(o.get(field)) for o in obs}
+    return grid[0], [by_hour.get(g) for g in grid]
+
+
+def _delta(series, hours):
+    """series 의 마지막 관측값과 hours 시간 전 관측값의 차이(없으면 None).
+    수위가 '오르는 중인지'는 절대 수위보다 위험 판단에 중요하다."""
+    vals = [(i, v) for i, v in enumerate(series) if v is not None]
+    if len(vals) < 2:
+        return None
+    last_i, last_v = vals[-1]
+    target = last_i - hours
+    past = [(i, v) for i, v in vals if i <= target]
+    if not past:
+        past = [vals[0]]
+    return round(last_v - past[-1][1], 3)
 
 
 def _f(v):

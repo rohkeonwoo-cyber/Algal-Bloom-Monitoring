@@ -1,0 +1,466 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>낙동강 침수 시나리오 3D</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --surface-1:#0d1518; --surface-2:#16232a; --surface-3:#1f3038; --border:#2b414b;
+    --ink-1:#eaf3f2; --ink-2:#a9c0c2; --ink-3:#72898d;
+    --accent:#2fb6bd; --accent-ink:#06282b;
+    --lv-normal:#7e8984; --lv-attn:#ffd95a; --lv-warn:#e68920;
+    --lv-alarm:#b8381a; --lv-serious:#6e040b;
+    color-scheme: dark;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--surface-1); color:var(--ink-1);
+        font-family:"Noto Sans KR","Malgun Gothic",sans-serif; overflow:hidden; }
+  .mono{ font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .display{ font-family:"Do Hyeon","Noto Sans KR",sans-serif; }
+
+  #stage{ position:fixed; inset:0; }
+  canvas{ display:block; }
+
+  .hud{ position:fixed; z-index:5; }
+  .topbar{
+    top:0; left:0; right:0; padding:12px 18px;
+    background:linear-gradient(180deg, rgba(8,14,16,.92), rgba(8,14,16,0));
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; pointer-events:none;
+  }
+  .topbar h1{ margin:0; font-size:19px; font-weight:400; letter-spacing:.3px; }
+  .topbar .sub{ font-size:12px; color:var(--ink-2); }
+  .topbar a{ color:var(--accent); pointer-events:auto; font-size:12px; margin-left:auto; }
+
+  .panel{
+    background:rgba(22,35,42,.93); border:1px solid var(--border); border-radius:14px;
+    padding:14px 16px; backdrop-filter:blur(8px);
+  }
+  .left{ left:18px; top:64px; width:296px; max-height:calc(100vh - 96px); overflow-y:auto; }
+  .left h2{ margin:0 0 9px; font-size:11px; letter-spacing:.7px; text-transform:uppercase;
+            color:var(--ink-3); font-weight:600; }
+  .left h2:not(:first-child){ margin-top:20px; }
+
+  .scen{ display:flex; flex-direction:column; gap:5px; }
+  .scen button{
+    all:unset; cursor:pointer; display:flex; align-items:center; gap:9px;
+    padding:8px 10px; border-radius:9px; border:1px solid var(--border);
+    font-size:13px; background:var(--surface-2);
+  }
+  .scen button:hover{ background:var(--surface-3); }
+  .scen button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .scen button[aria-pressed="true"]{ border-color:var(--accent); background:#12333a; }
+  .scen i{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+  .scen .nm{ flex:1; }
+  .scen .km2{ font-size:11.5px; color:var(--ink-2); }
+
+  .stats{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stat{ background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:8px 10px; }
+  .stat b{ display:block; font-family:"JetBrains Mono",monospace; font-size:17px; font-weight:600; }
+  .stat span{ font-size:10px; color:var(--ink-3); }
+
+  .ctl{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-2); margin-top:6px; }
+  .ctl input[type=range]{ flex:1; accent-color:var(--accent); }
+  .ctl .val{ width:34px; text-align:right; }
+
+  .swatches{ display:flex; height:11px; border-radius:6px; overflow:hidden; margin-top:4px; }
+  .swatches i{ flex:1; }
+  .swlabels{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-3); margin-top:4px; }
+
+  .note{ font-size:11px; line-height:1.6; color:var(--ink-2); }
+  .note b{ color:var(--ink-1); }
+  details{ margin-top:10px; }
+  summary{ cursor:pointer; font-size:11.5px; color:var(--accent); }
+  details .note{ margin-top:8px; }
+
+  .loading{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:var(--surface-1); z-index:20; flex-direction:column; gap:12px;
+  }
+  .loading .bar{ width:220px; height:3px; background:var(--surface-3); border-radius:2px; overflow:hidden; }
+  .loading .bar i{ display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
+  .loading p{ margin:0; font-size:12.5px; color:var(--ink-2); }
+  .err{ color:#ff9b7a; font-size:12.5px; max-width:460px; line-height:1.6; text-align:center; }
+
+  .hint{ bottom:14px; left:50%; transform:translateX(-50%); font-size:11.5px;
+         color:var(--ink-3); background:rgba(13,21,24,.8); padding:5px 12px; border-radius:20px; }
+
+  @media (max-width:720px){
+    .left{ left:8px; right:8px; width:auto; top:58px; max-height:44vh; }
+  }
+</style>
+
+<div id="stage"></div>
+
+<div class="hud topbar">
+  <h1 class="display">낙동강 침수 시나리오</h1>
+  <span class="sub" id="reachLabel">창녕함안보~합천창녕보</span>
+  <a href="../">← 조류 모니터로</a>
+</div>
+
+<div class="hud panel left">
+  <h2>수위 시나리오</h2>
+  <div class="scen" id="scenList"></div>
+
+  <h2>침수 규모</h2>
+  <div class="stats">
+    <div class="stat"><b class="mono" id="stArea">–</b><span>침수면적 km²</span></div>
+    <div class="stat"><b class="mono" id="stOff">–</b><span>하도 외 km²</span></div>
+    <div class="stat"><b class="mono" id="stDepth">–</b><span>평균수심 m</span></div>
+    <div class="stat"><b class="mono" id="stMax">–</b><span>최대수심 m</span></div>
+  </div>
+
+  <h2>수심</h2>
+  <div class="swatches" id="depthSwatches"></div>
+  <div class="swlabels"><span>0 m</span><span id="swMid">–</span><span id="swMax">–</span></div>
+
+  <h2>보기</h2>
+  <div class="ctl">
+    <label for="vex">수직과장</label>
+    <input type="range" id="vex" min="1" max="12" step="1" value="3">
+    <span class="val mono" id="vexVal">3×</span>
+  </div>
+  <div class="ctl">
+    <label for="opa">물 투명도</label>
+    <input type="range" id="opa" min="30" max="100" step="5" value="80">
+    <span class="val mono" id="opaVal">80</span>
+  </div>
+
+  <h2>검증과 한계</h2>
+  <div class="note" id="valNote">–</div>
+  <details>
+    <summary>어떻게 계산했나</summary>
+    <div class="note" id="methodNote"></div>
+  </details>
+</div>
+
+<div class="hud hint">드래그 회전 · 휠 확대 · 오른쪽 드래그(또는 Shift+드래그) 이동</div>
+
+<div class="loading" id="loading">
+  <p id="loadMsg">지형·침수 자료를 불러오는 중…</p>
+  <div class="bar"><i id="loadBar"></i></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+const SCEN_COLOR = {now:"#7e8984", att:"#ffd95a", wrn:"#e68920", alm:"#b8381a", srs:"#6e040b"};
+// 수심 색: 단일 색상(파랑) 명도 순차 — 얕음(밝음) → 깊음(어두움)
+const DEPTH_RAMP = ["#9fd8ef","#66b7e0","#3d92cd","#2a6fb0","#1d4f8f","#123467"];
+
+const el = id => document.getElementById(id);
+const loadBar = el("loadBar"), loadMsg = el("loadMsg");
+let done = 0, total = 1;
+function step(msg){
+  done++; loadBar.style.width = Math.min(100, 100*done/total) + "%";
+  if(msg) loadMsg.textContent = msg;
+}
+function fail(msg){
+  el("loading").innerHTML = `<p class="err">${msg}</p>`;
+}
+
+if(!window.THREE){
+  fail("3D 라이브러리(three.js)를 불러오지 못했습니다. 네트워크를 확인하고 새로고침해 주세요.");
+  return;
+}
+
+// ---------- 자료 읽기 ----------
+// PNG 는 16비트 값을 R(상위)·G(하위) 두 채널에 나눠 담았다 —
+// canvas 의 getImageData 가 8비트만 주기 때문(10d_웹출력.py save_u16 참조).
+function loadImage(src){
+  return new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=> res(im);
+    im.onerror = ()=> rej(new Error(src));
+    im.src = src;
+  });
+}
+function decodeRGB16(img){
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const ctx = c.getContext("2d", {willReadFrequently:true});
+  ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  const out = new Uint16Array(c.width * c.height);
+  for(let i = 0, j = 0; i < out.length; i++, j += 4) out[i] = (d[j] << 8) | d[j+1];
+  return {w:c.width, h:c.height, v:out};
+}
+
+let META, TERR, DEPTHS = {}, scene, camera, renderer, terrainMesh, waterMesh, group;
+let vex = 3, waterOpacity = 0.8, current = null;
+
+(async function init(){
+  let meta;
+  try{
+    const r = await fetch("meta.json", {cache:"no-store"});
+    if(!r.ok) throw new Error("meta.json " + r.status);
+    meta = await r.json();
+  }catch(e){
+    fail("자료를 불러오지 못했습니다 (" + e.message + ").<br>이 페이지는 웹주소로 열어야 합니다 — 파일로 직접 열면 자료를 읽을 수 없습니다.");
+    return;
+  }
+  META = meta;
+  total = 2 + meta.scenarios.length + (meta.texture ? 1 : 0);
+
+  let terrainImg, texImg = null;
+  try{
+    terrainImg = await loadImage("terrain.png"); step("지형 격자 해석 중…");
+    if(meta.texture){ texImg = await loadImage(meta.texture.file); step("위성영상 적용 중…"); }
+    for(const s of meta.scenarios){
+      DEPTHS[s.key] = decodeRGB16(await loadImage(s.file));
+      step(`침수 시나리오 ${s.label} 읽는 중…`);
+    }
+  }catch(e){
+    fail("자료 파일을 불러오지 못했습니다: " + e.message);
+    return;
+  }
+  TERR = decodeRGB16(terrainImg);
+  step("3차원 지형 만드는 중…");
+
+  buildUI(meta);
+  buildScene(meta, texImg);
+  const want = new URLSearchParams(location.search).get("s");
+  select(meta.scenarios.some(x => x.key === want) ? want : meta.scenarios[0].key);
+  el("loading").remove();
+  animate();
+})();
+
+// ---------- 장면 ----------
+function elevAt(i){ return TERR.v[i] * META.elev_scale + META.elev_offset_m; }
+
+function buildScene(meta, texImg){
+  const {w, h} = TERR;
+  const res = meta.res_m;
+  const spanX = (w - 1) * res, spanZ = (h - 1) * res;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d1518);
+  scene.fog = new THREE.Fog(0x0d1518, spanX * 0.9, spanX * 2.4);
+
+  camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 50, spanX * 6);
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  el("stage").appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+  const sun = new THREE.DirectionalLight(0xfff2e0, 0.85);
+  sun.position.set(-1, 1.6, 0.7).multiplyScalar(spanX);
+  scene.add(sun);
+
+  group = new THREE.Group();
+  scene.add(group);
+
+  // 지형: 격자 정점에 표고를 넣는다. y 가 높이, x/z 가 평면.
+  const geo = new THREE.PlaneGeometry(spanX, spanZ, w - 1, h - 1);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for(let i = 0; i < pos.count; i++) pos.setY(i, elevAt(i));
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshLambertMaterial({color:0xffffff});
+  if(texImg){
+    const tex = new THREE.Texture(texImg);
+    tex.needsUpdate = true;
+    tex.colorSpace = THREE.sRGBEncoding !== undefined ? undefined : undefined;
+    mat.map = tex;
+  } else {
+    mat.color = new THREE.Color(0x5d6b60);
+  }
+  terrainMesh = new THREE.Mesh(geo, mat);
+  group.add(terrainMesh);
+
+  group.scale.y = vex;
+  frameCamera(spanX, spanZ);
+  addEventListener("resize", ()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  setupControls(spanX);
+}
+
+// 침수 메시: 수심이 있는 화소로 이루어진 사각형만 골라 만든다.
+// 전체 격자를 덮고 투명도로 지우면 가장자리가 지저분해진다.
+function buildWater(key){
+  if(waterMesh){ group.remove(waterMesh); waterMesh.geometry.dispose(); waterMesh.material.dispose(); }
+  const D = DEPTHS[key], {w, h} = TERR, res = META.res_m;
+  const spanX = (w - 1) * res, spanZ = (h - 1) * res;
+  const x0 = -spanX / 2, z0 = -spanZ / 2;
+  const scale = META.depth_scale;
+
+  let maxD = 0;
+  for(let i = 0; i < D.v.length; i++) if(D.v[i] > maxD) maxD = D.v[i];
+  maxD *= scale;
+
+  const idxOf = new Int32Array(w * h).fill(-1);
+  const verts = [], cols = [], tris = [];
+  const ramp = DEPTH_RAMP.map(c => new THREE.Color(c));
+  function colorFor(d){
+    const t = Math.max(0, Math.min(1, maxD > 0 ? d / maxD : 0));
+    const f = t * (ramp.length - 1);
+    const i = Math.min(ramp.length - 2, Math.floor(f));
+    return ramp[i].clone().lerp(ramp[i+1], f - i);
+  }
+  for(let r = 0; r < h; r++){
+    for(let c = 0; c < w; c++){
+      const i = r * w + c;
+      const d = D.v[i] * scale;
+      if(d <= 0) continue;
+      idxOf[i] = verts.length / 3;
+      verts.push(x0 + c * res, elevAt(i) + d, z0 + r * res);
+      const col = colorFor(d);
+      cols.push(col.r, col.g, col.b);
+    }
+  }
+  for(let r = 0; r < h - 1; r++){
+    for(let c = 0; c < w - 1; c++){
+      const a = idxOf[r*w + c], b = idxOf[r*w + c + 1];
+      const cc = idxOf[(r+1)*w + c], dd = idxOf[(r+1)*w + c + 1];
+      if(a < 0 || b < 0 || cc < 0 || dd < 0) continue;   // 네 꼭짓점이 모두 침수일 때만
+      tris.push(a, cc, b, b, cc, dd);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+  g.setIndex(tris);
+  g.computeVertexNormals();
+  waterMesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
+    vertexColors:true, transparent:true, opacity:waterOpacity,
+    side:THREE.DoubleSide, depthWrite:false,
+  }));
+  group.add(waterMesh);
+  return maxD;
+}
+
+// ---------- 카메라 조작 (three.js 예제 OrbitControls 는 cdnjs 에 없어 직접 구현) ----------
+let orbit = {theta:-0.55, phi:0.42, dist:0, target:new THREE.Vector3()};
+function frameCamera(spanX, spanZ){
+  orbit.dist = Math.max(spanX, spanZ) * 0.78;
+  orbit.target.set(0, 0, 0);
+  applyCamera();
+}
+function applyCamera(){
+  orbit.phi = Math.max(0.12, Math.min(Math.PI/2 - 0.02, orbit.phi));
+  const {theta, phi, dist, target} = orbit;
+  camera.position.set(
+    target.x + dist * Math.cos(phi) * Math.sin(theta),
+    target.y + dist * Math.sin(phi),
+    target.z + dist * Math.cos(phi) * Math.cos(theta));
+  camera.lookAt(target);
+}
+function setupControls(spanX){
+  const dom = renderer.domElement;
+  let mode = null, px = 0, py = 0;
+  dom.style.cursor = "grab";
+  dom.addEventListener("contextmenu", e => e.preventDefault());
+  dom.addEventListener("pointerdown", e=>{
+    mode = (e.button === 2 || e.shiftKey) ? "pan" : "rot";
+    px = e.clientX; py = e.clientY;
+    dom.setPointerCapture(e.pointerId);
+    dom.style.cursor = "grabbing";
+  });
+  dom.addEventListener("pointermove", e=>{
+    if(!mode) return;
+    const dx = e.clientX - px, dy = e.clientY - py;
+    px = e.clientX; py = e.clientY;
+    if(mode === "rot"){
+      orbit.theta -= dx * 0.005;
+      orbit.phi   += dy * 0.005;
+    } else {
+      const k = orbit.dist / innerHeight * 1.4;
+      const right = new THREE.Vector3(Math.cos(orbit.theta), 0, -Math.sin(orbit.theta));
+      const fwd   = new THREE.Vector3(Math.sin(orbit.theta), 0, Math.cos(orbit.theta));
+      orbit.target.addScaledVector(right, -dx * k).addScaledVector(fwd, -dy * k);
+    }
+    applyCamera();
+  });
+  const end = e=>{ mode = null; dom.style.cursor = "grab"; };
+  dom.addEventListener("pointerup", end);
+  dom.addEventListener("pointercancel", end);
+  dom.addEventListener("wheel", e=>{
+    e.preventDefault();
+    orbit.dist *= e.deltaY > 0 ? 1.12 : 1/1.12;
+    orbit.dist = Math.max(spanX * 0.04, Math.min(spanX * 3, orbit.dist));
+    applyCamera();
+  }, {passive:false});
+}
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+// ---------- UI ----------
+function buildUI(meta){
+  el("reachLabel").textContent =
+    `창녕함안보~합천창녕보 (종단 ${meta.reach.s_lo}~${meta.reach.s_hi} km) · 격자 ${meta.res_m} m`;
+
+  const list = el("scenList");
+  meta.scenarios.forEach(s=>{
+    const b = document.createElement("button");
+    b.dataset.key = s.key;
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = `<i style="background:${SCEN_COLOR[s.key]}"></i>`
+      + `<span class="nm">${s.label}</span>`
+      + `<span class="km2 mono">${s.area_km2} km²</span>`;
+    b.addEventListener("click", ()=> select(s.key));
+    list.appendChild(b);
+  });
+
+  el("depthSwatches").innerHTML = DEPTH_RAMP.map(c=>`<i style="background:${c}"></i>`).join("");
+
+  el("vex").addEventListener("input", e=>{
+    vex = +e.target.value;
+    el("vexVal").textContent = vex + "×";
+    if(group) group.scale.y = vex;
+  });
+  el("opa").addEventListener("input", e=>{
+    waterOpacity = +e.target.value / 100;
+    el("opaVal").textContent = e.target.value;
+    if(waterMesh) waterMesh.material.opacity = waterOpacity;
+  });
+
+  const tex = meta.texture;
+  el("methodNote").innerHTML = `
+    <b>해발표고 = 관측수위 + 수위표 영점표고(gdt).</b> 담수역별 관심수위 표고가 하류→상류로
+    단조 증가하고(3.1→48.6 m), DEM 수면과 평균 +0.71 m 차이로 맞는 것을 확인했습니다.<br><br>
+    <b>수면종단</b>은 담수역(보~보) 안에서만 관측소 표고를 종단거리로 선형보간했습니다.
+    기관이 지점별로 정한 기준수위는 서로 정합되지 않아 종단이 역전되는 곳이 있어,
+    등위회귀로 최소한만 단조 보정했습니다(보정된 지점 수는 아래 표기).<br><br>
+    <b>침수 판정</b>은 각 화소에 가장 가까운 하도의 수면표고를 주고 DEM 보다 높으면 잠긴 것으로
+    보되, 하도와 이어지지 않은 고립 저지대는 제외했습니다.<br><br>
+    지형: Copernicus DEM GLO-30 (30 m, 화면은 ${meta.res_m} m 로 축소).
+    ${tex ? `위성: Sentinel-2 L2A ${tex.scenes.map(s=>s.date).join(", ")} (운량 ${tex.scenes[0].cloud}%).` : ""}
+    수위: 한강홍수통제소 Open API.`;
+}
+
+function select(key){
+  current = key;
+  try{ history.replaceState(null, "", "?s=" + key); }catch(e){}
+  const s = META.scenarios.find(x => x.key === key);
+  document.querySelectorAll("#scenList button").forEach(b=>
+    b.setAttribute("aria-pressed", String(b.dataset.key === key)));
+  const maxD = buildWater(key);
+  el("stArea").textContent = s.area_km2;
+  el("stOff").textContent = s.offchannel_km2;
+  el("stDepth").textContent = s.depth_mean_m ?? "–";
+  el("stMax").textContent = s.max_depth_m ?? "–";
+  el("swMax").textContent = maxD.toFixed(1) + " m";
+  el("swMid").textContent = (maxD/2).toFixed(1) + " m";
+
+  const adj = s.adjusted_gauges;
+  el("valNote").innerHTML = `
+    이 시나리오의 침수역 중 <b>${s.gsw_any_precision}%</b> 가 위성이 관측한 수면 흔적
+    (JRC Global Surface Water) 위에 있고, 상시수면의 <b>${s.gsw_permanent_recall}%</b> 를 재현합니다.
+    시나리오가 커질수록 앞 수치가 낮아지는 것은 정상입니다 — 홍수터는 평소 물이 없으니까요.<br><br>
+    단조 보정된 관측소 ${adj}개 · 하도 비연결 고립부 ${s.dropped_isolated_km2} km² 제외.<br><br>
+    <b>수리모형이 아닙니다.</b> DEM 이 수목·건물 높이를 포함하는 DSM 이고(침수 과소추정),
+    30 m 로는 제방·도로를 해상하지 못하며, 통수능·부정류 계산이 없습니다.
+    특정 지점의 침수 여부 판정에는 쓸 수 없는 <b>지형 기반 근사</b>입니다.<br><br>
+    특히 <b>지류 골짜기 안쪽까지 물이 차 보이는 것</b>은 모든 지점에 가장 가까운 본류 수면표고를
+    그대로 적용했기 때문입니다. 실제로는 합류부에서 멀어질수록 배수위 영향이 줄어들므로,
+    본류에서 먼 골짜기의 침수는 과대표시입니다.`;
+}
+})();
+</script>

@@ -1,0 +1,465 @@
+{
+ "grid": {
+  "w": 504,
+  "h": 542,
+  "down": 3
+ },
+ "res_m": 90.0,
+ "elev_offset_m": 0.5,
+ "encoding": "rgb16",
+ "elev_scale": 0.1,
+ "depth_scale": 0.01,
+ "bounds_5186": [
+  308701.7315047632,
+  297368.8538616505,
+  354061.7315047632,
+  346178.8538616505
+ ],
+ "bounds_4326": [
+  128.19461792988298,
+  35.2669803870271,
+  128.7022012685626,
+  35.700769459137256
+ ],
+ "extent_m": [
+  45360.0,
+  48810.0
+ ],
+ "elev_range_m": [
+  0.5,
+  1033.3
+ ],
+ "texture": {
+  "file": "texture.jpg",
+  "size": [
+   1512,
+   1627
+  ],
+  "scenes": [
+   {
+    "id": "S2B_MSIL2A_20240518T020649_R103_T52SDE_20240518T054112",
+    "date": "2024-05-18",
+    "cloud": 0.0
+   }
+  ],
+  "coverage_pct": 100.0
+ },
+ "reach": {
+  "s_lo": 74.0,
+  "s_hi": 117.0
+ },
+ "gauges": [
+  {
+   "name": "함안군(창녕함안보하)",
+   "s": 74.1,
+   "pool": 0,
+   "dist_km": 0.28,
+   "gdt": 0.0,
+   "now": 0.62,
+   "att": 5.9,
+   "wrn": 8.2,
+   "alm": 11.0,
+   "srs": 12.86
+  },
+  {
+   "name": "창녕군(창녕함안보상)",
+   "s": 74.3,
+   "pool": 1,
+   "dist_km": 0.31,
+   "gdt": 0.0,
+   "now": 4.99,
+   "att": 5.5,
+   "wrn": 9.1,
+   "alm": 11.0,
+   "srs": 13.3
+  },
+  {
+   "name": "함안군(소랑교)",
+   "s": 76.5,
+   "pool": 1,
+   "dist_km": 0.76,
+   "gdt": -0.168,
+   "now": 4.952,
+   "att": 5.502,
+   "wrn": 9.932,
+   "alm": 12.132,
+   "srs": 14.272
+  },
+  {
+   "name": "함안군(계내리)",
+   "s": 81.5,
+   "pool": 1,
+   "dist_km": 0.13,
+   "gdt": -21.356,
+   "now": 4.904,
+   "att": 5.494,
+   "wrn": 8.944,
+   "alm": 10.944,
+   "srs": 13.884
+  },
+  {
+   "name": "남지교",
+   "s": 82.3,
+   "pool": 1,
+   "dist_km": 0.2,
+   "gdt": 15.996,
+   "now": null,
+   "att": null,
+   "wrn": null,
+   "alm": null,
+   "srs": null
+  },
+  {
+   "name": "의령군(성산리)",
+   "s": 86.1,
+   "pool": 1,
+   "dist_km": 0.25,
+   "gdt": 3.086,
+   "now": 4.966,
+   "att": 8.086,
+   "wrn": 10.286,
+   "alm": 12.586,
+   "srs": 14.876
+  },
+  {
+   "name": "의령군(박진교)",
+   "s": 94.3,
+   "pool": 1,
+   "dist_km": 0.09,
+   "gdt": -5.181,
+   "now": 5.019,
+   "att": 8.719,
+   "wrn": 11.119,
+   "alm": 13.419,
+   "srs": 15.839
+  },
+  {
+   "name": "창녕군(유어교)",
+   "s": 107.5,
+   "pool": 1,
+   "dist_km": 0.51,
+   "gdt": 3.565,
+   "now": 5.445,
+   "att": 10.465,
+   "wrn": 13.065,
+   "alm": 15.665,
+   "srs": 18.275
+  },
+  {
+   "name": "합천군(적포교)",
+   "s": 109.5,
+   "pool": 1,
+   "dist_km": 0.09,
+   "gdt": -4.52,
+   "now": 5.05,
+   "att": 5.5,
+   "wrn": 12.08,
+   "alm": 14.58,
+   "srs": 17.38
+  },
+  {
+   "name": "합천군(합천창녕보하)",
+   "s": 116.5,
+   "pool": 1,
+   "dist_km": 0.2,
+   "gdt": 0.0,
+   "now": 5.0,
+   "att": 9.67,
+   "wrn": 12.5,
+   "alm": 15.0,
+   "srs": 18.24
+  },
+  {
+   "name": "합천군(합천창녕보상)",
+   "s": 116.7,
+   "pool": 1,
+   "dist_km": 0.09,
+   "gdt": 0.0,
+   "now": 9.25,
+   "att": 11.0,
+   "wrn": 14.3,
+   "alm": 17.0,
+   "srs": 18.81
+  }
+ ],
+ "scenarios": [
+  {
+   "key": "now",
+   "label": "현재 수위",
+   "area_km2": 22.43,
+   "offchannel_km2": 7.41,
+   "depth_mean_m": 0.97,
+   "depth_p95_m": 1.95,
+   "wse_range": [
+    0.62,
+    9.25
+   ],
+   "dropped_isolated_km2": 4.92,
+   "gsw_permanent_recall": 63.5,
+   "gsw_any_precision": 98.5,
+   "file": "depth_now.png",
+   "adjusted_gauges": 5,
+   "max_depth_m": 3.75
+  },
+  {
+   "key": "att",
+   "label": "관심수위",
+   "area_km2": 43.11,
+   "offchannel_km2": 27.61,
+   "depth_mean_m": 2.88,
+   "depth_p95_m": 5.4,
+   "wse_range": [
+    5.5,
+    11.0
+   ],
+   "dropped_isolated_km2": 41.16,
+   "gsw_permanent_recall": 87.7,
+   "gsw_any_precision": 85.5,
+   "file": "depth_att.png",
+   "adjusted_gauges": 3,
+   "max_depth_m": 5.5
+  },
+  {
+   "key": "wrn",
+   "label": "주의수위",
+   "area_km2": 86.63,
+   "offchannel_km2": 71.12,
+   "depth_mean_m": 3.98,
+   "depth_p95_m": 7.97,
+   "wse_range": [
+    8.2,
+    14.3
+   ],
+   "dropped_isolated_km2": 93.85,
+   "gsw_permanent_recall": 87.7,
+   "gsw_any_precision": 48.1,
+   "file": "depth_wrn.png",
+   "adjusted_gauges": 5,
+   "max_depth_m": 8.8
+  },
+  {
+   "key": "alm",
+   "label": "경계수위",
+   "area_km2": 207.75,
+   "offchannel_km2": 192.23,
+   "depth_mean_m": 4.39,
+   "depth_p95_m": 9.81,
+   "wse_range": [
+    11.0,
+    17.0
+   ],
+   "dropped_isolated_km2": 53.94,
+   "gsw_permanent_recall": 88.8,
+   "gsw_any_precision": 22.7,
+   "file": "depth_alm.png",
+   "adjusted_gauges": 5,
+   "max_depth_m": 11.5
+  },
+  {
+   "key": "srs",
+   "label": "심각수위",
+   "area_km2": 314.82,
+   "offchannel_km2": 299.3,
+   "depth_mean_m": 5.56,
+   "depth_p95_m": 11.04,
+   "wse_range": [
+    12.86,
+    18.81
+   ],
+   "dropped_isolated_km2": 8.34,
+   "gsw_permanent_recall": 89.1,
+   "gsw_any_precision": 16.9,
+   "file": "depth_srs.png",
+   "adjusted_gauges": 4,
+   "max_depth_m": 14.18
+  }
+ ],
+ "monotonic_adjustments": {
+  "now": [
+   {
+    "gauge": "창녕군(창녕함안보상)",
+    "s": 74.3,
+    "pool": 1,
+    "raw_el": 4.99,
+    "fitted_el": 4.95,
+    "adjust_m": -0.04
+   },
+   {
+    "gauge": "함안군(계내리)",
+    "s": 81.5,
+    "pool": 1,
+    "raw_el": 4.9,
+    "fitted_el": 4.95,
+    "adjust_m": 0.04
+   },
+   {
+    "gauge": "창녕군(유어교)",
+    "s": 107.5,
+    "pool": 1,
+    "raw_el": 5.45,
+    "fitted_el": 5.17,
+    "adjust_m": -0.28
+   },
+   {
+    "gauge": "합천군(적포교)",
+    "s": 109.5,
+    "pool": 1,
+    "raw_el": 5.05,
+    "fitted_el": 5.17,
+    "adjust_m": 0.12
+   },
+   {
+    "gauge": "합천군(합천창녕보하)",
+    "s": 116.5,
+    "pool": 1,
+    "raw_el": 5.0,
+    "fitted_el": 5.17,
+    "adjust_m": 0.17
+   }
+  ],
+  "att": [
+   {
+    "gauge": "의령군(박진교)",
+    "s": 94.3,
+    "pool": 1,
+    "raw_el": 8.72,
+    "fitted_el": 8.23,
+    "adjust_m": -0.49
+   },
+   {
+    "gauge": "창녕군(유어교)",
+    "s": 107.5,
+    "pool": 1,
+    "raw_el": 10.46,
+    "fitted_el": 8.23,
+    "adjust_m": -2.24
+   },
+   {
+    "gauge": "합천군(적포교)",
+    "s": 109.5,
+    "pool": 1,
+    "raw_el": 5.5,
+    "fitted_el": 8.23,
+    "adjust_m": 2.73
+   }
+  ],
+  "wrn": [
+   {
+    "gauge": "함안군(소랑교)",
+    "s": 76.5,
+    "pool": 1,
+    "raw_el": 9.93,
+    "fitted_el": 9.44,
+    "adjust_m": -0.49
+   },
+   {
+    "gauge": "함안군(계내리)",
+    "s": 81.5,
+    "pool": 1,
+    "raw_el": 8.94,
+    "fitted_el": 9.44,
+    "adjust_m": 0.49
+   },
+   {
+    "gauge": "창녕군(유어교)",
+    "s": 107.5,
+    "pool": 1,
+    "raw_el": 13.06,
+    "fitted_el": 12.55,
+    "adjust_m": -0.52
+   },
+   {
+    "gauge": "합천군(적포교)",
+    "s": 109.5,
+    "pool": 1,
+    "raw_el": 12.08,
+    "fitted_el": 12.55,
+    "adjust_m": 0.47
+   },
+   {
+    "gauge": "합천군(합천창녕보하)",
+    "s": 116.5,
+    "pool": 1,
+    "raw_el": 12.5,
+    "fitted_el": 12.55,
+    "adjust_m": 0.05
+   }
+  ],
+  "alm": [
+   {
+    "gauge": "함안군(소랑교)",
+    "s": 76.5,
+    "pool": 1,
+    "raw_el": 12.13,
+    "fitted_el": 11.54,
+    "adjust_m": -0.59
+   },
+   {
+    "gauge": "함안군(계내리)",
+    "s": 81.5,
+    "pool": 1,
+    "raw_el": 10.94,
+    "fitted_el": 11.54,
+    "adjust_m": 0.59
+   },
+   {
+    "gauge": "창녕군(유어교)",
+    "s": 107.5,
+    "pool": 1,
+    "raw_el": 15.66,
+    "fitted_el": 15.08,
+    "adjust_m": -0.58
+   },
+   {
+    "gauge": "합천군(적포교)",
+    "s": 109.5,
+    "pool": 1,
+    "raw_el": 14.58,
+    "fitted_el": 15.08,
+    "adjust_m": 0.5
+   },
+   {
+    "gauge": "합천군(합천창녕보하)",
+    "s": 116.5,
+    "pool": 1,
+    "raw_el": 15.0,
+    "fitted_el": 15.08,
+    "adjust_m": 0.08
+   }
+  ],
+  "srs": [
+   {
+    "gauge": "함안군(소랑교)",
+    "s": 76.5,
+    "pool": 1,
+    "raw_el": 14.27,
+    "fitted_el": 14.08,
+    "adjust_m": -0.19
+   },
+   {
+    "gauge": "함안군(계내리)",
+    "s": 81.5,
+    "pool": 1,
+    "raw_el": 13.88,
+    "fitted_el": 14.08,
+    "adjust_m": 0.19
+   },
+   {
+    "gauge": "창녕군(유어교)",
+    "s": 107.5,
+    "pool": 1,
+    "raw_el": 18.27,
+    "fitted_el": 17.83,
+    "adjust_m": -0.45
+   },
+   {
+    "gauge": "합천군(적포교)",
+    "s": 109.5,
+    "pool": 1,
+    "raw_el": 17.38,
+    "fitted_el": 17.83,
+    "adjust_m": 0.45
+   }
+  ]
+ }
+}

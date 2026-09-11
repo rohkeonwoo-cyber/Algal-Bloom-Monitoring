@@ -91,6 +91,19 @@
   .cap-tile.t-status .cap-tile-icon svg{ stroke:var(--status-ink); color:var(--status-ink); }
   .cap-tile.t-status .cap-tile-label{ background:var(--status); }
 
+  .flood-link{
+    display:flex; align-items:center; gap:14px; margin-top:16px; max-width:760px;
+    padding:14px 18px; border-radius:12px; text-decoration:none;
+    background: linear-gradient(100deg, var(--hero-1) 0%, var(--hero-2) 78%, var(--hero-3) 140%);
+    color:#fff; box-shadow: 0 1px 2px rgba(15,33,29,.10);
+  }
+  .flood-link:hover{ filter:brightness(1.1); }
+  .flood-link:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .flood-link svg{ width:26px; height:26px; flex-shrink:0; stroke:#8fd3f4; }
+  .flood-link span{ font-size:11.5px; line-height:1.6; color:rgba(255,255,255,.76); }
+  .flood-link b{ display:block; font-size:14px; color:#fff; font-weight:600; margin-bottom:2px; }
+  .flood-go{ margin-left:auto; font-size:17px; color:rgba(255,255,255,.6) !important; }
+
   .layout{ display:flex; gap:28px; align-items:flex-start; }
 
   .map-panel{
@@ -376,6 +389,20 @@
         <div class="cap-tile-label">취약구간 진단</div>
       </div>
     </div>
+
+    <a class="flood-link" href="flood/">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 15c1.6 0 1.6-1.4 3.2-1.4S7.8 15 9.4 15s1.6-1.4 3.2-1.4S14.2 15 15.8 15s1.6-1.4 3.2-1.4S20.6 15 22 15"></path>
+        <path d="M3 19c1.6 0 1.6-1.4 3.2-1.4S7.8 19 9.4 19s1.6-1.4 3.2-1.4S14.2 19 15.8 19s1.6-1.4 3.2-1.4S20.6 19 22 19"></path>
+        <path d="M5 10.5 12 4l7 6.5"></path>
+      </svg>
+      <span>
+        <b>침수 시나리오 3D</b>
+        수위가 관심·주의·경계·심각 단계로 오르면 어디까지 잠기는지 —
+        창녕함안보~합천창녕보 구간을 3차원 지형에서 봅니다
+      </span>
+      <span class="flood-go" aria-hidden="true">→</span>
+    </a>
   </header>
 
   <div class="layout">
