@@ -1022,10 +1022,13 @@ function fmtStamp(iso){
   const p = n => String(n).padStart(2,"0");
   return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function fmtObsTime(ymdhm){   // "202609111600" → "09.11 16:00"
+// HRFCO 1H 자료의 ymdhm 은 12자리가 아니라 10자리(YYYYMMDDHH)로 온다.
+// 12자리로 가정하면 전부 "–" 가 된다(실제로 그렇게 나왔다). 두 길이를 모두 받는다.
+function fmtObsTime(ymdhm){   // "2026091116" → "09.11 16:00"
   const s = String(ymdhm || "");
-  if(s.length < 12) return "–";
-  return `${s.slice(4,6)}.${s.slice(6,8)} ${s.slice(8,10)}:${s.slice(10,12)}`;
+  if(s.length < 10) return "–";
+  const mm = s.length >= 12 ? s.slice(10, 12) : "00";
+  return `${s.slice(4,6)}.${s.slice(6,8)} ${s.slice(8,10)}:${mm}`;
 }
 
 // ---- 조류경보 4개 지점 위치 ----
