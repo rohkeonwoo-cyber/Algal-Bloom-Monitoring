@@ -58,8 +58,21 @@ if git diff --staged --quiet; then
   echo "갱신된 내용 없음 — 커밋 생략"
 else
   git commit -m "chore: 실시간 데이터 갱신 ($(date '+%Y-%m-%d %H:%M'))"
-  git push
-  echo "푸시 완료"
+fi
+
+# 푸시는 커밋 여부와 분리한다. 지난 회차에 푸시가 실패(네트워크·인증)해 로컬 커밋이
+# 밀려 있는데 이번 회차에 데이터 변화가 없으면, 커밋과 함께 푸시까지 건너뛰어
+# 밀린 커밋이 영구히 올라가지 않는다. 그래서 "origin보다 앞서 있으면 푸시".
+ahead=$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)
+if [ "$ahead" -gt 0 ]; then
+  if git push; then
+    echo "푸시 완료 (커밋 ${ahead}개)"
+  else
+    echo "경고: 푸시 실패 — 커밋 ${ahead}개가 로컬에 남았습니다(다음 회차에 재시도)." >&2
+    exit 1
+  fi
+else
+  echo "올릴 커밋 없음"
 fi
 
 echo "=== 완료 ==="
