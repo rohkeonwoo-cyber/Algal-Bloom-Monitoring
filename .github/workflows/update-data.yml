@@ -21,20 +21,38 @@ jobs:
       - name: 의존성 설치
         run: pip install requests
 
+      # 해외(GitHub) 서버에서 국내 공공API에 실제로 닿는지 먼저 확인한다.
+      # 국내 기관 API가 해외 IP를 차단하는 경우가 있어, 어느 쪽이 막히는지 로그로 남긴다.
+      - name: 접속 진단
+        continue-on-error: true
+        run: |
+          echo "=== api.hrfco.go.kr (한강홍수통제소) ==="
+          curl -sS -o /dev/null -m 15 -w "HTTP %{http_code} / 연결 %{time_connect}s / 총 %{time_total}s\n" \
+            "https://api.hrfco.go.kr/" || echo "→ 연결 실패(차단 가능성)"
+          echo "=== apis.data.go.kr (공공데이터포털) ==="
+          curl -sS -o /dev/null -m 15 -w "HTTP %{http_code} / 연결 %{time_connect}s / 총 %{time_total}s\n" \
+            "https://apis.data.go.kr/" || echo "→ 연결 실패(차단 가능성)"
+
       - name: 한강홍수통제소(수위·강수량·홍수예보) 수집
+        continue-on-error: true    # 막혀도 다음 단계는 진행
         env:
           HRFCO_KEY: ${{ secrets.HRFCO_KEY }}
         run: python scripts/fetch_hrfco.py
 
       - name: 조류경보제 최신값 수집
+        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python scripts/fetch_algae.py
 
-      - name: data/*.json 커밋
+      - name: 변경된 data/*.json 커밋
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/*.json
-          git diff --staged --quiet || git commit -m "chore: 실시간 데이터 갱신 [skip ci]"
-          git push
+          git add -A data/
+          if git diff --staged --quiet; then
+            echo "갱신된 데이터 없음(수집 실패했거나 값이 그대로) — 커밋 생략"
+          else
+            git commit -m "chore: 실시간 데이터 갱신 [skip ci]"
+            git push
+          fi
