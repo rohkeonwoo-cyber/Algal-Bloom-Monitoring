@@ -3,6 +3,3 @@ __pycache__/
 *.env
 build/sat_bg_png_b64.txt
 
-# 브이월드 개발용 인증키(localhost 전용) — 저장소에 올리지 않는다.
-# 운영용 키는 등록 도메인에서만 동작하므로 공개되어도 무방하며 별도로 커밋한다.
-flood/vworld-key.js
