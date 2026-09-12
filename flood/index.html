@@ -207,6 +207,7 @@
 (function(){
 "use strict";
 
+const SKY_LOW = 0x9fb6c4, SKY_HIGH = 0x2c4a63;   // 지평선(밝음) → 천정(어두움)
 const SCEN_COLOR = {now:"#7e8984", att:"#ffd95a", wrn:"#e68920", alm:"#b8381a", srs:"#6e040b"};
 // 수심 색: 단일 색상(파랑) 명도 순차 — 얕음(밝음) → 깊음(어두움)
 const DEPTH_RAMP = ["#9fd8ef","#66b7e0","#3d92cd","#2a6fb0","#1d4f8f","#123467"];
@@ -225,20 +226,27 @@ function waterCss(depth, pct){
 function makeWaterMaterial(){
   return new THREE.ShaderMaterial({
     transparent:true, depthWrite:false, side:THREE.DoubleSide,
-    uniforms:{ uMul:{value:waterOpacity}, uK:{value:WATER_K} },
+    uniforms:{ uMul:{value:waterOpacity}, uK:{value:WATER_K},
+               uFogColor:{value:new THREE.Color(SKY_LOW)},
+               uFogNear:{value:SPANX * 0.8}, uFogFar:{value:SPANX * 3.0} },
     vertexShader:`
       attribute float aDepth;
       varying float vDepth;
       varying vec3 vNormalW;
+      varying float vDist;
       void main(){
         vDepth = aDepth;
         vNormalW = normalize(normalMatrix * normal);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vDist = -mv.z;
+        gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader:`
       uniform float uMul; uniform float uK;
+      uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar;
       varying float vDepth;
       varying vec3 vNormalW;
+      varying float vDist;
       void main(){
         float a = 1.0 - exp(-uK * vDepth);            // 수심이 깊을수록 1 에 수렴
         vec3 shallow = vec3(0.64, 0.86, 0.95);
@@ -247,7 +255,8 @@ function makeWaterMaterial(){
         // 수면이 기울어 보이는 곳에 약한 하이라이트 — 물이라는 느낌만 준다
         col += 0.10 * pow(max(vNormalW.z, 0.0), 3.0);
         float alpha = clamp(a * 0.90 + 0.08, 0.0, 1.0) * uMul;
-        gl_FragColor = vec4(col, alpha);
+        float f = smoothstep(uFogNear, uFogFar, vDist);
+        gl_FragColor = vec4(mix(col, uFogColor, f), alpha * (1.0 - f * 0.7));
       }`,
   });
 }
@@ -334,6 +343,32 @@ let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 // ---------- 장면 ----------
 function elevAt(i){ return TERR.v[i] * META.elev_scale + META.elev_offset_m; }
 
+// 렌더 전용 평활 표고. 30 m 격자를 그대로 세우면 능선이 계단처럼 꺾여 보인다.
+// 3×3 이항 커널 한 번으로 표본화 계단만 눌러준다(지형을 만들어내지 않는 최소한).
+// 수심·표고 판독과 침수 계산에는 원본 elevAt() 을 그대로 쓴다.
+let ELEV_SMOOTH = null;
+function buildSmoothElev(){
+  const n = GW * GH, out = new Float32Array(n), src = TERR.v;
+  const sc = META.elev_scale, off = META.elev_offset_m;
+  const tmp = new Float32Array(n);
+  for(let r = 0; r < GH; r++){            // 가로 방향 1-2-1
+    const o = r * GW;
+    for(let c = 0; c < GW; c++){
+      const a = src[o + Math.max(0, c-1)], b = src[o + c], d = src[o + Math.min(GW-1, c+1)];
+      tmp[o + c] = (a + 2*b + d) * 0.25;
+    }
+  }
+  for(let c = 0; c < GW; c++){            // 세로 방향 1-2-1
+    for(let r = 0; r < GH; r++){
+      const a = tmp[Math.max(0, r-1)*GW + c], b = tmp[r*GW + c],
+            d = tmp[Math.min(GH-1, r+1)*GW + c];
+      out[r*GW + c] = (a + 2*b + d) * 0.25 * sc + off;
+    }
+  }
+  ELEV_SMOOTH = out;
+}
+function elevRender(i){ return ELEV_SMOOTH ? ELEV_SMOOTH[i] : elevAt(i); }
+
 function buildScene(meta, texImg){
   const {w, h} = TERR;
   const res = meta.res_m;
@@ -346,8 +381,19 @@ function buildScene(meta, texImg){
   meshStep = (innerWidth < 900 || (navigator.deviceMemory || 8) < 4) ? 2 : 1;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d1518);
-  scene.fog = new THREE.Fog(0x0d1518, spanX * 0.9, spanX * 2.4);
+  scene.background = new THREE.Color(SKY_LOW);
+  // 하늘 돔 — 배경이 단색이면 지형이 오려 붙인 것처럼 뜬다. 지평선 쪽을 밝게 둔다.
+  const skyGeo = new THREE.SphereGeometry(Math.max(spanX, spanZ) * 4, 32, 16);
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms:{ uLow:{value:new THREE.Color(SKY_LOW)}, uHigh:{value:new THREE.Color(SKY_HIGH)} },
+    vertexShader:`varying vec3 vP; void main(){ vP = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader:`uniform vec3 uLow; uniform vec3 uHigh; varying vec3 vP;
+      void main(){ float h = clamp(normalize(vP).y * 1.6 + 0.15, 0.0, 1.0);
+        gl_FragColor = vec4(mix(uLow, uHigh, h), 1.0); }`,
+  });
+  scene.add(new THREE.Mesh(skyGeo, skyMat));
 
   camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 50, spanX * 6);
   renderer = new THREE.WebGLRenderer({antialias:true});
@@ -383,23 +429,31 @@ function buildScene(meta, texImg){
       uHasBase:{value: baseTex ? 1 : 0},
       uVex:{value: vex},
       uLightDir:{value: new THREE.Vector3(-1, 1.6, 0.7).normalize()},
+      uSky:{value: new THREE.Color(0xbcd2e0)},      // 위에서 오는 하늘빛
+      uGround:{value: new THREE.Color(0x6b6152)},   // 아래에서 되받는 땅빛
+      uFogColor:{value: new THREE.Color(SKY_LOW)},
+      uFogNear:{value: spanX * 0.8},
+      uFogFar:{value: spanX * 3.0},
     },
     vertexShader:`
       attribute vec2 aMerc;
       uniform float uVex;
-      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw;
+      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw; varying float vDist;
       void main(){
         vUv = uv; vMerc = aMerc;
         // 정점은 과장 전 표고로 놓고 그룹 스케일(0,vex,0)로 늘린다 →
         // 법선은 스케일의 역수를 곱해야 맞다(diag(1,1/vex,1)).
         vNw = normalize(vec3(normal.x, normal.y / uVex, normal.z));
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vDist = -mv.z;
+        gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader:`
       uniform sampler2D uBase; uniform sampler2D uDetail;
       uniform vec4 uRect; uniform float uHasDetail; uniform float uHasBase;
-      uniform vec3 uLightDir;
-      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw;
+      uniform vec3 uLightDir; uniform vec3 uSky; uniform vec3 uGround;
+      uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar;
+      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw; varying float vDist;
       void main(){
         vec3 c = uHasBase > 0.5 ? texture2D(uBase, vUv).rgb : vec3(0.36, 0.42, 0.38);
         if(uHasDetail > 0.5){
@@ -409,9 +463,17 @@ function buildScene(meta, texImg){
             c = mix(c, texture2D(uDetail, d).rgb, smoothstep(0.0, 0.02, e));
           }
         }
-        // AmbientLight(0.62) + DirectionalLight(0.85) 와 같은 값
-        float diff = max(dot(normalize(vNw), uLightDir), 0.0);
-        gl_FragColor = vec4(c * (0.62 + 0.85 * diff), 1.0);
+        vec3 n = normalize(vNw);
+        // 단일 환경광 대신 반구광: 위는 하늘빛, 아래는 땅에서 되받는 빛.
+        // 평지와 사면의 색이 달라져 지형이 평평한 판처럼 보이지 않는다.
+        vec3 amb = mix(uGround, uSky, 0.5 + 0.5 * n.y) * 0.74;
+        float diff = max(dot(n, uLightDir), 0.0);
+        // 경사가 급할수록 살짝 어둡게 — 골짜기에 그늘이 지는 느낌(그림자 계산 없이)
+        float ao = mix(0.88, 1.0, smoothstep(0.25, 0.95, n.y));
+        vec3 lit = c * (amb + vec3(0.86) * diff) * ao;
+        // 먼 곳은 대기에 잠기게 — 지형 끝이 칼로 자른 듯 끊기는 것을 없앤다
+        float f = smoothstep(uFogNear, uFogFar, vDist);
+        gl_FragColor = vec4(mix(lit, uFogColor, f), 1.0);
       }`,
   });
   buildTerrain();
@@ -594,6 +656,7 @@ function scheduleDetail(){
 // 지형 메시. PlaneGeometry 대신 직접 만들어 격자 간격(meshStep)을 고를 수 있게 한다 —
 // 원본 30 m 격자는 정점 246만개라 약한 기기에서는 버겁다.
 function buildTerrain(){
+  if(!ELEV_SMOOTH) buildSmoothElev();
   if(terrainMesh){ group.remove(terrainMesh); terrainMesh.geometry.dispose(); }
   const st = meshStep;
   const nx = Math.floor((GW - 1) / st) + 1, ny = Math.floor((GH - 1) / st) + 1;
@@ -608,7 +671,7 @@ function buildTerrain(){
       const c = Math.min(GW - 1, i * st);
       const k = j * nx + i;
       pos[k*3]   = x0 + c * RES;
-      pos[k*3+1] = elevAt(r * GW + c);
+      pos[k*3+1] = elevRender(r * GW + c);
       pos[k*3+2] = z0 + r * RES;
       uv[k*2]   = c / (GW - 1);
       uv[k*2+1] = 1 - r / (GH - 1);
@@ -662,7 +725,7 @@ function buildWater(key){
       // 임의 감쇠 모형을 끼워넣는 대신, 보이는 범위를 직접 자를 수 있게 한다.
       if(DIST && DIST.v[i] * (META.dist_scale || 1) > distLimit) continue;
       idxOf[i] = verts.length / 3;
-      verts.push(x0 + c * res, elevAt(i) + d, z0 + r * res);
+      verts.push(x0 + c * res, elevRender(i) + d, z0 + r * res);
       depths.push(d);
     }
   }
