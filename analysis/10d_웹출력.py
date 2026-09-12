@@ -211,10 +211,12 @@ def fetch_texture(bounds, crs, W, H):
     if not used:
         return None
     img = np.where(cnt > 0, acc / np.maximum(cnt, 1), 0).astype("uint8")
-    # 위성영상은 색 경계가 부드러워 크로마 서브샘플링 손실이 눈에 띄지 않는다.
-    # 품질 88+subsampling 0 은 7.3 MB 로 과했다.
+    # 품질 80 + 기본 크로마 서브샘플링(4:2:0)은 식생처럼 잔무늬가 많은 면에서
+    # 눈에 띄게 뭉갠다. 지형 텍스처는 확대해서 보는 용도이므로 서브샘플링을 끄고
+    # 품질을 올린다(용량 증가는 감수).
     Image.fromarray(np.transpose(img, (1, 2, 0))).save(OUT / "texture.jpg",
-                                                       quality=80, optimize=True)
+                                                       quality=90, subsampling=0,
+                                                       optimize=True)
     return {"file": "texture.jpg", "size": [tw, th], "scenes": used,
             "coverage_pct": round(float(100 * (cnt > 0).mean()), 1)}
 
