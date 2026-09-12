@@ -96,6 +96,8 @@
   .ro-row b{ font-family:"JetBrains Mono",monospace; font-size:14px; font-weight:600; }
   .ro-depth b{ font-size:20px; }
   .ro-none{ font-size:11.5px; color:var(--ink-3); line-height:1.6; }
+  .ro-warn{ font-size:10.5px; line-height:1.55; color:#ffd08a; background:#3a2a12;
+            border:1px solid #6b4a18; border-radius:8px; padding:7px 9px; margin-top:9px; }
   @media (max-width:900px){ .readout{ display:none; } }
 
   .hint{ bottom:14px; left:50%; transform:translateX(-50%); font-size:11.5px;
@@ -819,13 +821,20 @@ function updateReadout(clientX, clientY){
   if(DIST && distKm * 1000 > distLimit) depth = 0;     // 화면에서 잘라낸 곳은 0 으로 읽는다
   const lon = META.bounds_4326[0] + (g.c/(GW-1)) * (META.bounds_4326[2] - META.bounds_4326[0]);
   const lat = META.bounds_4326[3] - (g.r/(GH-1)) * (META.bounds_4326[3] - META.bounds_4326[1]);
+  // 하도 화소(본류 거리 0)는 DEM 값이 하상이 아니라 레이더 촬영 당시 수면이다
+  const inChannel = distKm !== null && distKm === 0;
+  const ch = META.channel || {};
   body.innerHTML = `
-    <div class="ro-row ro-depth"><span>수심</span>
+    <div class="ro-row ro-depth"><span>${inChannel ? "수면 대비 수심" : "수심"}</span>
       <b style="color:${depth > 0 ? "#2a6fb0" : "var(--ink-3)"}">${depth > 0 ? depth.toFixed(2)+" m" : "잠기지 않음"}</b></div>
-    <div class="ro-row"><span>지면 표고</span><b>${elev.toFixed(1)} m</b></div>
+    <div class="ro-row"><span>${inChannel ? "DEM 표고(수면)" : "지면 표고"}</span><b>${elev.toFixed(1)} m</b></div>
     ${depth > 0 ? `<div class="ro-row"><span>수면 표고</span><b>${(elev+depth).toFixed(1)} m</b></div>` : ""}
     <div class="ro-row"><span>본류 거리</span><b>${distKm === null ? "–" : distKm.toFixed(1)+" km"}</b></div>
-    <div class="ro-row"><span>좌표</span><b style="font-size:11px">${lat.toFixed(4)}, ${lon.toFixed(4)}</b></div>`;
+    <div class="ro-row"><span>좌표</span><b style="font-size:11px">${lat.toFixed(4)}, ${lon.toFixed(4)}</b></div>
+    ${inChannel ? `<div class="ro-warn"><b>하도 안입니다.</b> 이 표고는 하상이 아니라
+      레이더가 찍은 <b>당시 수면</b>입니다 — 레이더는 물을 투과하지 못합니다.
+      실제 하상은 이보다 더 아래이고(담수역 평균수심 ${ch.pool_mean_depth_m ?? "–"} m),
+      여기 적힌 수심은 하상까지의 깊이가 아닙니다.</div>` : ""}`;
   if(!pickMark){
     pickMark = new THREE.Mesh(new THREE.SphereGeometry(RES*1.2, 12, 8),
                               new THREE.MeshBasicMaterial({color:0x2fb6bd}));
@@ -971,6 +980,11 @@ function select(key){
     <b>수리모형이 아닙니다.</b> DEM 이 수목·건물 높이를 포함하는 DSM 이고(침수 과소추정),
     30 m 로는 제방·도로를 해상하지 못하며, 통수능·부정류 계산이 없습니다.
     특정 지점의 침수 여부 판정에는 쓸 수 없는 <b>지형 기반 근사</b>입니다.<br><br>
+    <b>하도 안의 수심은 실제 하천 수심이 아닙니다.</b> Copernicus DEM 은 레이더 기반이라
+    물을 투과하지 못해, 하도 화소의 표고는 하상이 아니라 촬영 당시 수면입니다.
+    실제로 이 구간 하도의 DEM 표고는 43 km 내내 4.0 m 근처로 거의 평평한데(표준편차 0.59 m),
+    하상이라면 여울과 소로 훨씬 크게 흩어져야 합니다. 담수역 평균수심은 6.32 m 이므로
+    하상은 그만큼 더 아래에 있습니다. 하도 밖 홍수터의 수심은 이 문제가 없습니다.<br><br>
     특히 <b>지류 골짜기 안쪽까지 물이 차 보이는 것</b>은 모든 지점에 가장 가까운 본류 수면표고를
     그대로 적용했기 때문입니다. 실제로는 합류부에서 멀어질수록 배수위 영향이 줄어들므로,
     본류에서 먼 골짜기의 침수는 과대표시입니다 —

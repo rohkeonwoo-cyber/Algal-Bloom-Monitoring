@@ -422,5 +422,13 @@
       "gsw_permanent_recall": 89.1,
       "gsw_any_precision": 16.9
     }
-  ]
+  ],
+  "channel": {
+    "dem_median_el_m": 4.0,
+    "dem_sd_m": 0.59,
+    "dem_is_water_surface": true,
+    "current_wse_median_el_m": 4.95,
+    "pool_mean_depth_m": 6.32,
+    "note": "하도 화소의 DEM 은 하상이 아니라 레이더 촬영 당시 수면이다(레이더는 물을 투과하지 못함). 하도 안의 수심 값은 '그 수면 대비'이며 실제 하상까지의 깊이가 아니다. 담수역 평균수심은 06_기초통계 §7."
+  }
 }

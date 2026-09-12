@@ -150,9 +150,15 @@ def main():
             print(f"  GSW 대조: 상시수면 재현율 {rec['gsw_permanent_recall']}% · "
                   f"침수역 중 GSW 수면흔적 있는 비율 {rec['gsw_any_precision']}%")
 
+    ch = channel_facts(dem, channel, seg, gauges)
+    print(f"\n하도 DEM 진단: 중위표고 {ch['dem_median_el_m']} m, 표준편차 {ch['dem_sd_m']} m "
+          f"→ {'수면으로 판단' if ch['dem_is_water_surface'] else '하상 가능성'}")
+    print(f"  담수역 평균수심(06_기초통계 §7) {ch['pool_mean_depth_m']} m "
+          f"→ 실제 하상은 현재 수면보다 그만큼 아래")
+
     (WORK / "10c_결과.json").write_text(
         json.dumps({"reach": {"s_lo": S_LO, "s_hi": S_HI}, "res_m": px,
-                    "gauges": gauges, "scenarios": results},
+                    "gauges": gauges, "scenarios": results, "channel": ch},
                    ensure_ascii=False, indent=2), encoding="utf-8")
     print("\n저장:", WORK / "10c_결과.json")
 
@@ -189,6 +195,32 @@ def isotonic_nondecreasing(y):
     for v, n in blocks:
         out.extend([v] * n)
     return np.array(out)
+
+
+def channel_facts(dem, channel, seg, gauges):
+    """하도 안의 DEM 이 하상인지 수면인지 진단한다.
+
+    Copernicus DEM 은 TanDEM-X 레이더 기반이고 레이더는 물을 투과하지 못한다.
+    따라서 하도 화소의 값은 하상이 아니라 **촬영 당시 수면**일 가능성이 높다.
+    43 km 구간에서 표고가 거의 변하지 않으면(여울·소가 안 보이면) 수면으로 본다.
+    """
+    v = dem[channel]
+    v = v[np.isfinite(v)]
+    sd = float(v.std())
+    med = float(np.median(v))
+    # 06_기초통계.md §7: 구간별 수심 자료는 없고 담수역 평균수심만 산정 가능
+    pool_depth = float(np.nanmedian(seg["DEPTH_M"].values.astype(float)))
+    now = [g["now"] for g in gauges if g.get("now") is not None]
+    return {
+        "dem_median_el_m": round(med, 2),
+        "dem_sd_m": round(sd, 2),
+        "dem_is_water_surface": bool(sd < 2.0),
+        "current_wse_median_el_m": round(float(np.median(now)), 2) if now else None,
+        "pool_mean_depth_m": round(pool_depth, 2),
+        "note": ("하도 화소의 DEM 은 하상이 아니라 레이더 촬영 당시 수면이다"
+                 "(레이더는 물을 투과하지 못함). 하도 안의 수심 값은 '그 수면 대비'"
+                 "이며 실제 하상까지의 깊이가 아니다. 담수역 평균수심은 06_기초통계 §7."),
+    }
 
 
 def wse_field(gauges, key, near_s, near_pool, inrange, adjust_log=None):

@@ -80,7 +80,15 @@ def main():
     print(f"  본류거리   dist.png       {(OUT/'dist.png').stat().st_size/1024:7.0f} KB  "
           f"최대 {dist_s.max()/1000:.1f} km")
 
-    tex = fetch_texture(bounds, crs, W, H)
+    # 텍스처는 내려받는 데 오래 걸리고 자주 바뀌지 않는다. 이미 있으면 그대로 쓴다.
+    import sys as _sys
+    if "--keep-texture" in _sys.argv and (OUT / "texture.jpg").exists():
+        prev = json.loads((OUT / "meta.json").read_text(encoding="utf-8")) \
+            if (OUT / "meta.json").exists() else {}
+        tex = prev.get("texture")
+        print("텍스처 재사용(--keep-texture)")
+    else:
+        tex = fetch_texture(bounds, crs, W, H)
     to4326 = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
     lon0, lat0 = to4326.transform(bounds.left, bounds.bottom)
     lon1, lat1 = to4326.transform(bounds.right, bounds.top)
@@ -100,6 +108,7 @@ def main():
         "elev_range_m": [round(float(np.nanmin(dem_s)), 1), round(float(np.nanmax(dem_s)), 1)],
         "texture": tex,
         "reach": res["reach"],
+        "channel": res.get("channel"),
         "gauges": res["gauges"],
         "scenarios": scen_meta,
         "monotonic_adjustments": {s["key"]: s.get("monotonic_adjustments", [])
