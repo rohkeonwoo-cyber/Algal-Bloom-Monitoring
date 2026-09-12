@@ -80,6 +80,20 @@
   .loading p{ margin:0; font-size:12.5px; color:var(--ink-2); }
   .err{ color:#ff9b7a; font-size:12.5px; max-width:460px; line-height:1.6; text-align:center; }
 
+  .readout{
+    right:18px; top:64px; width:212px;
+  }
+  .readout h2{ margin:0 0 10px; font-size:11px; letter-spacing:.7px; text-transform:uppercase;
+               color:var(--ink-3); font-weight:600; }
+  .ro-row{ display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+           padding:5px 0; border-top:1px solid var(--border); }
+  .ro-row:first-of-type{ border-top:none; }
+  .ro-row span{ font-size:11.5px; color:var(--ink-2); }
+  .ro-row b{ font-family:"JetBrains Mono",monospace; font-size:14px; font-weight:600; }
+  .ro-depth b{ font-size:20px; }
+  .ro-none{ font-size:11.5px; color:var(--ink-3); line-height:1.6; }
+  @media (max-width:900px){ .readout{ display:none; } }
+
   .hint{ bottom:14px; left:50%; transform:translateX(-50%); font-size:11.5px;
          color:var(--ink-3); background:rgba(13,21,24,.8); padding:5px 12px; border-radius:20px; }
 
@@ -119,6 +133,15 @@
     <span class="val mono" id="vexVal">3×</span>
   </div>
   <div class="ctl">
+    <label for="mres">지형 해상도</label>
+    <select id="mres" style="flex:1; background:var(--surface-2); color:var(--ink-1);
+            border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-size:11.5px;">
+      <option value="1">30 m (원본)</option>
+      <option value="2">60 m (가벼움)</option>
+      <option value="3">90 m (매우 가벼움)</option>
+    </select>
+  </div>
+  <div class="ctl">
     <label for="dlim">본류 거리</label>
     <input type="range" id="dlim" min="1" max="15" step="1" value="15">
     <span class="val mono" id="dlimVal">15km</span>
@@ -129,12 +152,21 @@
     <span class="val mono" id="opaVal">80</span>
   </div>
 
+  <div class="ctl" style="justify-content:space-between">
+    <span>지형 정점</span><span class="val mono" id="vertCount" style="width:auto">–</span>
+  </div>
+
   <h2>검증과 한계</h2>
   <div class="note" id="valNote">–</div>
   <details>
     <summary>어떻게 계산했나</summary>
     <div class="note" id="methodNote"></div>
   </details>
+</div>
+
+<div class="hud panel readout" id="readout">
+  <h2>가리킨 지점</h2>
+  <div id="roBody"><div class="ro-none">지형 위에 마우스를 올리면 그 지점의 수심과 표고를 읽습니다.</div></div>
 </div>
 
 <div class="hud hint">드래그 회전 · 휠 확대 · 오른쪽 드래그(또는 Shift+드래그) 이동</div>
@@ -191,8 +223,9 @@ function decodeRGB16(img){
   return {w:c.width, h:c.height, v:out};
 }
 
-let META, TERR, DIST = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, waterMesh, group;
+let META, TERR, DIST = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
 let vex = 3, waterOpacity = 0.8, current = null, distLimit = Infinity;
+let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 
 (async function init(){
   let meta;
@@ -238,6 +271,9 @@ function buildScene(meta, texImg){
   const {w, h} = TERR;
   const res = meta.res_m;
   const spanX = (w - 1) * res, spanZ = (h - 1) * res;
+  GW = w; GH = h; RES = res; SPANX = spanX; SPANZ = spanZ;
+  // 246만 정점을 모든 기기가 감당하지는 못한다. 화면이 좁으면 절반 밀도로 시작한다.
+  meshStep = (innerWidth < 900 || (navigator.deviceMemory || 8) < 4) ? 2 : 1;
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1518);
@@ -257,24 +293,18 @@ function buildScene(meta, texImg){
   group = new THREE.Group();
   scene.add(group);
 
-  // 지형: 격자 정점에 표고를 넣는다. y 가 높이, x/z 가 평면.
-  const geo = new THREE.PlaneGeometry(spanX, spanZ, w - 1, h - 1);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  for(let i = 0; i < pos.count; i++) pos.setY(i, elevAt(i));
-  geo.computeVertexNormals();
-
-  const mat = new THREE.MeshLambertMaterial({color:0xffffff});
+  terrainMat = new THREE.MeshLambertMaterial({color:0xffffff});
   if(texImg){
     const tex = new THREE.Texture(texImg);
     tex.needsUpdate = true;
-    tex.colorSpace = THREE.sRGBEncoding !== undefined ? undefined : undefined;
-    mat.map = tex;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    terrainMat.map = tex;
   } else {
-    mat.color = new THREE.Color(0x5d6b60);
+    terrainMat.color = new THREE.Color(0x5d6b60);
   }
-  terrainMesh = new THREE.Mesh(geo, mat);
-  group.add(terrainMesh);
+  buildTerrain();
 
   group.scale.y = vex;
   frameCamera(spanX, spanZ);
@@ -284,6 +314,46 @@ function buildScene(meta, texImg){
     renderer.setSize(innerWidth, innerHeight);
   });
   setupControls(spanX);
+}
+
+// 지형 메시. PlaneGeometry 대신 직접 만들어 격자 간격(meshStep)을 고를 수 있게 한다 —
+// 원본 30 m 격자는 정점 246만개라 약한 기기에서는 버겁다.
+function buildTerrain(){
+  if(terrainMesh){ group.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+  const st = meshStep;
+  const nx = Math.floor((GW - 1) / st) + 1, ny = Math.floor((GH - 1) / st) + 1;
+  const pos = new Float32Array(nx * ny * 3);
+  const uv = new Float32Array(nx * ny * 2);
+  const x0 = -SPANX / 2, z0 = -SPANZ / 2;
+  for(let j = 0; j < ny; j++){
+    const r = Math.min(GH - 1, j * st);
+    for(let i = 0; i < nx; i++){
+      const c = Math.min(GW - 1, i * st);
+      const k = j * nx + i;
+      pos[k*3]   = x0 + c * RES;
+      pos[k*3+1] = elevAt(r * GW + c);
+      pos[k*3+2] = z0 + r * RES;
+      uv[k*2]   = c / (GW - 1);
+      uv[k*2+1] = 1 - r / (GH - 1);
+    }
+  }
+  const idx = new (nx*ny > 65535 ? Uint32Array : Uint16Array)((nx-1)*(ny-1)*6);
+  let q = 0;
+  for(let j = 0; j < ny - 1; j++){
+    for(let i = 0; i < nx - 1; i++){
+      const a = j*nx + i, b = a + 1, c2 = a + nx, d = c2 + 1;
+      idx[q++] = a; idx[q++] = c2; idx[q++] = b;
+      idx[q++] = b; idx[q++] = c2; idx[q++] = d;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  terrainMesh = new THREE.Mesh(g, terrainMat);
+  group.add(terrainMesh);
+  el("vertCount").textContent = (nx*ny/1e4).toFixed(0) + "만";
 }
 
 // 침수 메시: 수심이 있는 화소로 이루어진 사각형만 골라 만든다.
@@ -308,8 +378,9 @@ function buildWater(key){
     const i = Math.min(ramp.length - 2, Math.floor(f));
     return ramp[i].clone().lerp(ramp[i+1], f - i);
   }
-  for(let r = 0; r < h; r++){
-    for(let c = 0; c < w; c++){
+  const st = meshStep;
+  for(let r = 0; r < h; r += st){
+    for(let c = 0; c < w; c += st){
       const i = r * w + c;
       const d = D.v[i] * scale;
       if(d <= 0) continue;
@@ -322,10 +393,10 @@ function buildWater(key){
       cols.push(col.r, col.g, col.b);
     }
   }
-  for(let r = 0; r < h - 1; r++){
-    for(let c = 0; c < w - 1; c++){
-      const a = idxOf[r*w + c], b = idxOf[r*w + c + 1];
-      const cc = idxOf[(r+1)*w + c], dd = idxOf[(r+1)*w + c + 1];
+  for(let r = 0; r + st < h; r += st){
+    for(let c = 0; c + st < w; c += st){
+      const a = idxOf[r*w + c], b = idxOf[r*w + c + st];
+      const cc = idxOf[(r+st)*w + c], dd = idxOf[(r+st)*w + c + st];
       if(a < 0 || b < 0 || cc < 0 || dd < 0) continue;   // 네 꼭짓점이 모두 침수일 때만
       tris.push(a, cc, b, b, cc, dd);
     }
@@ -385,6 +456,11 @@ function setupControls(spanX){
     }
     applyCamera();
   });
+  dom.addEventListener("pointermove", e=>{
+    if(mode) return;                   // 회전·이동 중에는 읽지 않는다
+    updateReadout(e.clientX, e.clientY);
+  });
+  dom.addEventListener("pointerleave", ()=>{ if(pickMark) pickMark.visible = false; });
   const end = e=>{ mode = null; dom.style.cursor = "grab"; };
   dom.addEventListener("pointerup", end);
   dom.addEventListener("pointercancel", end);
@@ -395,6 +471,81 @@ function setupControls(spanX){
     applyCamera();
   }, {passive:false});
 }
+/* ---- 가리킨 지점 읽기 ----
+   정점 246만개짜리 메시에 레이캐스터를 쓰면 삼각형을 전수 검사해 마우스마다 멎는다.
+   대신 표고 배열을 직접 가지고 있으므로 광선을 따라가며 지표 아래로 내려가는 지점을
+   찾는다(높이장 레이마칭). 표본 수백 번이면 끝나고 격자 인덱스도 바로 나온다. */
+function gridAt(x, z){
+  const c = (x + SPANX/2) / RES, r = (z + SPANZ/2) / RES;
+  if(c < 0 || r < 0 || c > GW-1 || r > GH-1) return null;
+  return {c:Math.round(c), r:Math.round(r)};
+}
+function surfaceY(x, z){          // 세계좌표 기준 지표 높이(수직과장 반영)
+  const g = gridAt(x, z);
+  if(!g) return null;
+  return elevAt(g.r * GW + g.c) * vex;
+}
+function pickPoint(clientX, clientY){
+  const ndc = new THREE.Vector2(
+    (clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(ndc, camera);
+  const o = ray.ray.origin, d = ray.ray.direction;
+  const step = RES;                       // 격자 한 칸씩
+  const maxT = Math.max(SPANX, SPANZ) * 3;
+  let t = 0, prev = null;
+  for(; t < maxT; t += step){
+    const x = o.x + d.x*t, y = o.y + d.y*t, z = o.z + d.z*t;
+    const s = surfaceY(x, z);
+    if(s === null){ prev = null; continue; }
+    if(y <= s){
+      let lo = prev === null ? Math.max(0, t - step) : prev, hi = t;
+      for(let k = 0; k < 14; k++){      // 이분 정밀화
+        const m = (lo + hi) / 2;
+        const yy = o.y + d.y*m, ss = surfaceY(o.x + d.x*m, o.z + d.z*m);
+        if(ss !== null && yy <= ss) hi = m; else lo = m;
+      }
+      const x2 = o.x + d.x*hi, z2 = o.z + d.z*hi;
+      return gridAt(x2, z2);
+    }
+    prev = t;
+  }
+  return null;
+}
+function updateReadout(clientX, clientY){
+  const body = el("roBody");
+  const g = pickPoint(clientX, clientY);
+  if(!g){
+    body.innerHTML = `<div class="ro-none">지형 바깥입니다. 지형 위에 마우스를 올려주세요.</div>`;
+    return;
+  }
+  const i = g.r * GW + g.c;
+  const elev = elevAt(i);
+  const D = DEPTHS[current];
+  let depth = D ? D.v[i] * META.depth_scale : 0;
+  const distKm = DIST ? DIST.v[i] * (META.dist_scale || 1) / 1000 : null;
+  if(DIST && distKm * 1000 > distLimit) depth = 0;     // 화면에서 잘라낸 곳은 0 으로 읽는다
+  const lon = META.bounds_4326[0] + (g.c/(GW-1)) * (META.bounds_4326[2] - META.bounds_4326[0]);
+  const lat = META.bounds_4326[3] - (g.r/(GH-1)) * (META.bounds_4326[3] - META.bounds_4326[1]);
+  body.innerHTML = `
+    <div class="ro-row ro-depth"><span>수심</span>
+      <b style="color:${depth > 0 ? "#2a6fb0" : "var(--ink-3)"}">${depth > 0 ? depth.toFixed(2)+" m" : "잠기지 않음"}</b></div>
+    <div class="ro-row"><span>지면 표고</span><b>${elev.toFixed(1)} m</b></div>
+    ${depth > 0 ? `<div class="ro-row"><span>수면 표고</span><b>${(elev+depth).toFixed(1)} m</b></div>` : ""}
+    <div class="ro-row"><span>본류 거리</span><b>${distKm === null ? "–" : distKm.toFixed(1)+" km"}</b></div>
+    <div class="ro-row"><span>좌표</span><b style="font-size:11px">${lat.toFixed(4)}, ${lon.toFixed(4)}</b></div>`;
+  if(!pickMark){
+    pickMark = new THREE.Mesh(new THREE.SphereGeometry(RES*1.2, 12, 8),
+                              new THREE.MeshBasicMaterial({color:0x2fb6bd}));
+    pickMark.renderOrder = 2;
+    group.add(pickMark);
+  }
+  pickMark.visible = true;
+  pickMark.position.set(-SPANX/2 + g.c*RES, elev + depth, -SPANZ/2 + g.r*RES);
+  pickMark.scale.setScalar(Math.max(0.6, orbit.dist / SPANX * 2.2));
+}
+let pickMark = null;
+
 function animate(){
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
@@ -419,6 +570,12 @@ function buildUI(meta){
 
   el("depthSwatches").innerHTML = DEPTH_RAMP.map(c=>`<i style="background:${c}"></i>`).join("");
 
+  el("mres").value = String(meshStep);
+  el("mres").addEventListener("change", e=>{
+    meshStep = +e.target.value;
+    buildTerrain();
+    if(current) buildWater(current);   // 침수 메시도 같은 간격으로 다시 만든다
+  });
   el("vex").addEventListener("input", e=>{
     vex = +e.target.value;
     el("vexVal").textContent = vex + "×";

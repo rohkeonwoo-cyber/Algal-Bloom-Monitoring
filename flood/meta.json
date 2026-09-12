@@ -1,10 +1,10 @@
 {
  "grid": {
-  "w": 504,
-  "h": 542,
-  "down": 3
+  "w": 1512,
+  "h": 1627,
+  "down": 1
  },
- "res_m": 90.0,
+ "res_m": 30.0,
  "elev_offset_m": 0.5,
  "encoding": "rgb16",
  "elev_scale": 0.1,
@@ -30,13 +30,13 @@
  ],
  "elev_range_m": [
   0.5,
-  1033.3
+  1051.8
  ],
  "texture": {
   "file": "texture.jpg",
   "size": [
-   1512,
-   1627
+   4536,
+   4881
   ],
   "scenes": [
    {

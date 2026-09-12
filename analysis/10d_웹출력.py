@@ -4,6 +4,7 @@
   terrain.png    표고 (R=상위/G=하위 바이트로 담은 16비트, 단위 dm, 오프셋은 meta 에)
   depth_*.png    시나리오별 침수심 (같은 방식, 단위 cm, 0 = 침수 아님)
   texture.jpg    Sentinel-2 TCI 위성영상 (지형 표면에 입힐 텍스처)
+  dist.png       본류 하도로부터의 거리 (같은 방식, 단위 m)
   meta.json      격자 크기·좌표범위·스케일·시나리오 요약
 
 왜 PNG 인가: PNG 는 무손실이고 침수심처럼 대부분이 0 인 격자에서 압축이 잘 든다.
@@ -29,8 +30,9 @@ WORK = BASE / "work"
 OUT = BASE.parent / "09_manuscript" / "dashboard" / "flood"
 OUT.mkdir(parents=True, exist_ok=True)
 
-DOWN = 3            # 격자 축소 배율 (1512x1627 -> 504x542, 정점 27만개)
-TEX_MAX = 2048      # 위성 텍스처 한 변 최대 화소
+DOWN = 1            # 1 = DEM 원해상도(30 m) 그대로. 뷰어가 필요하면 더 솎아 쓴다
+TEX_MAX = 4608      # 위성 텍스처 한 변 최대 화소 (Sentinel-2 원해상도 10 m 에 맞춤)
+MAX_DIST_VIEW = 15000   # 10c 의 판단 반경과 같게 (뷰어 슬라이더 상한)
 
 
 def main():
@@ -42,7 +44,7 @@ def main():
 
     dem = grids["dem"]
     # 축소: 표고는 평균, 침수심은 최대(얇은 침수대가 사라지지 않게)
-    dem_s = block_reduce(dem, DOWN, np.nanmean)
+    dem_s = dem if DOWN == 1 else block_reduce(dem, DOWN, np.nanmean)
     h, w = dem_s.shape
     print(f"격자 {W}x{H} -> {w}x{h} (1/{DOWN}), 정점 {w*h:,}개")
 
@@ -56,7 +58,8 @@ def main():
     scen_meta = []
     for s in res["scenarios"]:
         key = s["key"]
-        d = block_reduce(grids[f"depth_{key}"], DOWN, np.nanmax)
+        dd = grids[f"depth_{key}"]
+        d = dd if DOWN == 1 else block_reduce(dd, DOWN, np.nanmax)
         d_cm = np.nan_to_num(d * 100, nan=0).round()
         d_cm = np.clip(d_cm, 0, 65534)
         p = OUT / f"depth_{key}.png"
@@ -67,6 +70,15 @@ def main():
                           "max_depth_m": round(float(d.max()), 2)})
         print(f"  {s['label']:<10} {p.name:<16} {p.stat().st_size/1024:7.0f} KB  "
               f"최대수심 {d.max():.1f} m  면적 {s['area_km2']} km²")
+
+    # 본류로부터의 거리 — 뷰어에서 "지류 몇 km 까지 볼지" 를 직접 자르게 한다.
+    # 최근접 하도 수면을 그대로 적용한 탓에 지류 골짜기 침수가 과대표시되는데,
+    # 모형으로 임의 감쇠시키는 대신 범위를 드러내고 사용자가 제한하도록 한다.
+    dist_s = grids["dist"] if DOWN == 1 else block_reduce(grids["dist"], DOWN, np.nanmin)
+    dist_m = np.nan_to_num(np.clip(dist_s, 0, 65534), nan=65534).round()
+    save_u16(dist_m, OUT / "dist.png")
+    print(f"  본류거리   dist.png       {(OUT/'dist.png').stat().st_size/1024:7.0f} KB  "
+          f"최대 {dist_s.max()/1000:.1f} km")
 
     tex = fetch_texture(bounds, crs, W, H)
     to4326 = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
@@ -80,6 +92,8 @@ def main():
         "encoding": "rgb16",         # 값 = R*256 + G
         "elev_scale": 0.1,           # 값 * scale + offset = 표고(m)
         "depth_scale": 0.01,         # 값 * scale = 수심(m)
+        "dist_file": "dist.png", "dist_scale": 1.0,   # 값 = 본류로부터 거리(m)
+        "dist_max_m": MAX_DIST_VIEW,
         "bounds_5186": [bounds.left, bounds.bottom, bounds.right, bounds.top],
         "bounds_4326": [lon0, lat0, lon1, lat1],
         "extent_m": [bounds.right - bounds.left, bounds.top - bounds.bottom],
@@ -97,6 +111,18 @@ def main():
     print(f"\n저장: {OUT}  (총 {total/1024/1024:.1f} MB)")
     for p in sorted(OUT.iterdir()):
         print(f"  {p.name:<18}{p.stat().st_size/1024:8.0f} KB")
+
+
+def window_for(src, bounds, crs):
+    """대상 범위(EPSG:5186)를 원본 영상 좌표계의 읽기 창으로 바꾼다."""
+    from rasterio.warp import transform_bounds
+    from rasterio.windows import from_bounds as win_from_bounds
+    try:
+        b = transform_bounds(crs, src.crs, bounds.left, bounds.bottom,
+                             bounds.right, bounds.top, densify_pts=21)
+        return win_from_bounds(*b, transform=src.transform).round_offsets().round_lengths()
+    except Exception:
+        return None
 
 
 def block_reduce(a, k, fn):
@@ -141,26 +167,38 @@ def fetch_texture(bounds, crs, W, H):
     items.sort(key=lambda it: it.properties.get("eo:cloud_cover", 100))
     print(f"위성 후보 {len(items)}장, 최저운량 {items[0].properties.get('eo:cloud_cover'):.1f}%")
 
-    tw = min(TEX_MAX, W)
+    tw = min(TEX_MAX, round((bounds.right - bounds.left) / 10))   # 10 m/화소 상한
     th = int(round(tw * H / W))
     tf_out = rasterio.transform.from_bounds(bounds.left, bounds.bottom,
                                             bounds.right, bounds.top, tw, th)
+    print(f"텍스처 목표 {tw}x{th} ({(bounds.right-bounds.left)/tw:.1f} m/화소)")
     acc = np.zeros((3, th, tw), dtype="float32")
-    cnt = np.zeros((th, tw), dtype="float32")
+    cnt = np.zeros((3, th, tw), dtype="float32")[0]
     used = []
     for it in items[:6]:
         try:
             with rasterio.open(it.assets["visual"].href) as src:
-                # 원본 전체를 네트워크로 끌어오지 않도록 축소해서 읽는다
-                sw = min(2400, src.width)
-                sh = int(round(sw * src.height / src.width))
-                arr = src.read(out_shape=(3, sh, sw), resampling=Resampling.average)
-                stf = src.transform * src.transform.scale(src.width / sw, src.height / sh)
+                # 타일 전체(10980²)를 끌어오지 않고, 필요한 구역만 창으로 읽는다.
+                # 예전처럼 전체를 축소해 읽으면 4608 화소 텍스처에 쓸 해상도가 안 나온다.
+                win = window_for(src, bounds, crs)
+                if win is None:
+                    continue
+                sh = int(win.height); sw = int(win.width)
+                if sw < 1 or sh < 1:
+                    continue
+                cap = 2 * max(tw, th)                     # 과도한 전송 방지
+                if max(sw, sh) > cap:
+                    k = cap / max(sw, sh)
+                    sw, sh = max(1, int(sw * k)), max(1, int(sh * k))
+                arr = src.read(out_shape=(3, sh, sw), window=win,
+                               resampling=Resampling.average, boundless=True, fill_value=0)
+                wtf = src.window_transform(win)
+                stf = wtf * wtf.scale(win.width / sw, win.height / sh)
                 buf = np.zeros((3, th, tw), dtype="uint8")
                 reproject(arr, buf, src_transform=stf, src_crs=src.crs,
                           dst_transform=tf_out, dst_crs=crs, resampling=Resampling.bilinear)
         except Exception as e:
-            print(f"  {it.id}: 읽기 실패 {type(e).__name__}")
+            print(f"  {it.id}: 읽기 실패 {type(e).__name__}: {str(e)[:60]}")
             continue
         m = buf.sum(axis=0) > 0
         acc[:, m] += buf[:, m]
@@ -173,7 +211,10 @@ def fetch_texture(bounds, crs, W, H):
     if not used:
         return None
     img = np.where(cnt > 0, acc / np.maximum(cnt, 1), 0).astype("uint8")
-    Image.fromarray(np.transpose(img, (1, 2, 0))).save(OUT / "texture.jpg", quality=86)
+    # 위성영상은 색 경계가 부드러워 크로마 서브샘플링 손실이 눈에 띄지 않는다.
+    # 품질 88+subsampling 0 은 7.3 MB 로 과했다.
+    Image.fromarray(np.transpose(img, (1, 2, 0))).save(OUT / "texture.jpg",
+                                                       quality=80, optimize=True)
     return {"file": "texture.jpg", "size": [tw, th], "scenes": used,
             "coverage_pct": round(float(100 * (cnt > 0).mean()), 1)}
 
