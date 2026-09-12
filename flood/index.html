@@ -61,8 +61,12 @@
   .ctl input[type=range]{ flex:1; accent-color:var(--accent); }
   .ctl .val{ width:34px; text-align:right; }
 
-  .swatches{ display:flex; height:11px; border-radius:6px; overflow:hidden; margin-top:4px; }
-  .swatches i{ flex:1; }
+  /* 범례는 "지형 위에 물이 얹힌 상태"를 보여야 한다 — 얕은 쪽이 비치는 게 핵심이므로
+     단색 칩을 나열하는 대신 지형색 바탕에 실제 감쇠식으로 계산한 그라디언트를 덮는다. */
+  .swatches{ position:relative; height:15px; border-radius:6px; overflow:hidden; margin-top:4px;
+             background:repeating-linear-gradient(48deg,#6d7f57 0 6px,#7d8f64 6px 12px); }
+  .swatches i{ position:absolute; inset:0; display:block; }
+  .swnote{ font-size:10.5px; color:var(--ink-3); margin-top:5px; line-height:1.5; }
   .swlabels{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-3); margin-top:4px; }
 
   .note{ font-size:11px; line-height:1.6; color:var(--ink-2); }
@@ -125,6 +129,7 @@
   <h2>수심</h2>
   <div class="swatches" id="depthSwatches"></div>
   <div class="swlabels"><span>0 m</span><span id="swMid">–</span><span id="swMax">–</span></div>
+  <div class="swnote">얕은 곳은 잠긴 지형이 비쳐 보이고, 깊어질수록 물빛에 가려집니다.</div>
 
   <h2>보기</h2>
   <div class="ctl">
@@ -147,9 +152,9 @@
     <span class="val mono" id="dlimVal">15km</span>
   </div>
   <div class="ctl">
-    <label for="opa">물 투명도</label>
-    <input type="range" id="opa" min="30" max="100" step="5" value="80">
-    <span class="val mono" id="opaVal">80</span>
+    <label for="opa">물 진하기</label>
+    <input type="range" id="opa" min="30" max="100" step="5" value="100">
+    <span class="val mono" id="opaVal">100</span>
   </div>
 
   <div class="ctl" style="justify-content:space-between">
@@ -184,6 +189,47 @@
 const SCEN_COLOR = {now:"#7e8984", att:"#ffd95a", wrn:"#e68920", alm:"#b8381a", srs:"#6e040b"};
 // 수심 색: 단일 색상(파랑) 명도 순차 — 얕음(밝음) → 깊음(어두움)
 const DEPTH_RAMP = ["#9fd8ef","#66b7e0","#3d92cd","#2a6fb0","#1d4f8f","#123467"];
+// 얕은 물은 바닥이 비치고 깊을수록 물빛에 가려진다 — 실제 물의 감쇠(Beer-Lambert)와 같은 꼴.
+// 균일 투명도로는 "얼마나 찼는지"가 안 읽혀서 불투명도를 수심의 함수로 준다.
+const WATER_K = 0.45;   // 1/m. 1 m 에서 36%, 3 m 에서 74%, 8 m 에서 97% 가려짐
+// 셰이더와 같은 식으로 범례 색을 만든다 — 범례와 화면이 어긋나지 않게 한 곳에서 계산한다.
+function waterCss(depth, pct){
+  const a = 1 - Math.exp(-WATER_K * depth);
+  const sh = [163, 219, 242], dp = [13, 48, 107];
+  const c = sh.map((v, i) => Math.round(v + (dp[i] - v) * Math.min(1, Math.max(0, a))));
+  const alpha = Math.min(1, a * 0.90 + 0.08);
+  return `rgba(${c[0]},${c[1]},${c[2]},${alpha.toFixed(3)}) ${pct.toFixed(0)}%`;
+}
+
+function makeWaterMaterial(){
+  return new THREE.ShaderMaterial({
+    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    uniforms:{ uMul:{value:waterOpacity}, uK:{value:WATER_K} },
+    vertexShader:`
+      attribute float aDepth;
+      varying float vDepth;
+      varying vec3 vNormalW;
+      void main(){
+        vDepth = aDepth;
+        vNormalW = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader:`
+      uniform float uMul; uniform float uK;
+      varying float vDepth;
+      varying vec3 vNormalW;
+      void main(){
+        float a = 1.0 - exp(-uK * vDepth);            // 수심이 깊을수록 1 에 수렴
+        vec3 shallow = vec3(0.64, 0.86, 0.95);
+        vec3 deep    = vec3(0.05, 0.19, 0.42);
+        vec3 col = mix(shallow, deep, clamp(a, 0.0, 1.0));
+        // 수면이 기울어 보이는 곳에 약한 하이라이트 — 물이라는 느낌만 준다
+        col += 0.10 * pow(max(vNormalW.z, 0.0), 3.0);
+        float alpha = clamp(a * 0.90 + 0.08, 0.0, 1.0) * uMul;
+        gl_FragColor = vec4(col, alpha);
+      }`,
+  });
+}
 
 const el = id => document.getElementById(id);
 const loadBar = el("loadBar"), loadMsg = el("loadMsg");
@@ -224,7 +270,7 @@ function decodeRGB16(img){
 }
 
 let META, TERR, DIST = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
-let vex = 3, waterOpacity = 0.8, current = null, distLimit = Infinity;
+let vex = 3, waterOpacity = 1.0, current = null, distLimit = Infinity;
 let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 
 (async function init(){
@@ -370,14 +416,7 @@ function buildWater(key){
   maxD *= scale;
 
   const idxOf = new Int32Array(w * h).fill(-1);
-  const verts = [], cols = [], tris = [];
-  const ramp = DEPTH_RAMP.map(c => new THREE.Color(c));
-  function colorFor(d){
-    const t = Math.max(0, Math.min(1, maxD > 0 ? d / maxD : 0));
-    const f = t * (ramp.length - 1);
-    const i = Math.min(ramp.length - 2, Math.floor(f));
-    return ramp[i].clone().lerp(ramp[i+1], f - i);
-  }
+  const verts = [], depths = [], tris = [];
   const st = meshStep;
   for(let r = 0; r < h; r += st){
     for(let c = 0; c < w; c += st){
@@ -389,8 +428,7 @@ function buildWater(key){
       if(DIST && DIST.v[i] * (META.dist_scale || 1) > distLimit) continue;
       idxOf[i] = verts.length / 3;
       verts.push(x0 + c * res, elevAt(i) + d, z0 + r * res);
-      const col = colorFor(d);
-      cols.push(col.r, col.g, col.b);
+      depths.push(d);
     }
   }
   for(let r = 0; r + st < h; r += st){
@@ -403,13 +441,11 @@ function buildWater(key){
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+  g.setAttribute("aDepth", new THREE.Float32BufferAttribute(depths, 1));
   g.setIndex(tris);
   g.computeVertexNormals();
-  waterMesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
-    vertexColors:true, transparent:true, opacity:waterOpacity,
-    side:THREE.DoubleSide, depthWrite:false,
-  }));
+  waterMesh = new THREE.Mesh(g, makeWaterMaterial());
+  waterMesh.renderOrder = 1;
   group.add(waterMesh);
   return maxD;
 }
@@ -568,8 +604,6 @@ function buildUI(meta){
     list.appendChild(b);
   });
 
-  el("depthSwatches").innerHTML = DEPTH_RAMP.map(c=>`<i style="background:${c}"></i>`).join("");
-
   el("mres").value = String(meshStep);
   el("mres").addEventListener("change", e=>{
     meshStep = +e.target.value;
@@ -596,7 +630,7 @@ function buildUI(meta){
   el("opa").addEventListener("input", e=>{
     waterOpacity = +e.target.value / 100;
     el("opaVal").textContent = e.target.value;
-    if(waterMesh) waterMesh.material.opacity = waterOpacity;
+    if(waterMesh) waterMesh.material.uniforms.uMul.value = waterOpacity;
   });
 
   const tex = meta.texture;
@@ -626,6 +660,8 @@ function select(key){
   el("stMax").textContent = s.max_depth_m ?? "–";
   el("swMax").textContent = maxD.toFixed(1) + " m";
   el("swMid").textContent = (maxD/2).toFixed(1) + " m";
+  el("depthSwatches").innerHTML = `<i style="background:linear-gradient(90deg,${
+    Array.from({length:9}, (_, k) => waterCss(maxD * k/8, k/8*100)).join(",")})"></i>`;
 
   const adj = s.adjusted_gauges;
   el("valNote").innerHTML = `
