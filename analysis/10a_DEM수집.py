@@ -1,4 +1,4 @@
-"""창녕함안보(dfe 74)~합천창녕보(dfe 117) 구간의 DEM 을 Planetary Computer 에서 받아
+"""낙동강 본류 전 구간(하구둑~영강합류부)의 DEM 을 Planetary Computer 에서 받아
 EPSG:5186 30m 격자로 만든다.
 
 Copernicus DEM GLO-30 (TanDEM-X 기반 DSM, 수직기준 EGM2008 지오이드).
@@ -19,8 +19,10 @@ BASE = pathlib.Path(__file__).resolve().parent
 WORK = BASE / "work"
 WORK.mkdir(exist_ok=True)
 
-S_LO, S_HI = 74.0, 117.0        # 구간(창녕함안보~합천창녕보)
-BUF_M = 12000                   # 홍수터를 담기 위한 좌우 여유
+# 전 구간(하구둑~영강합류부). 처음에는 창녕함안보~합천창녕보 43 km 로 시범 제작했으나,
+# Chl-a 는 268 km 전체이고 조류경보 4지점도 흩어져 있어 한 화면에 같이 보려면 전 구간이 필요하다.
+S_LO, S_HI = 0.0, 268.0
+BUF_M = 10000                   # 홍수터를 담기 위한 좌우 여유
 RES = 30.0
 
 seg = gpd.read_file(BASE.parent / "06_morph" / "06_종단구간.shp")

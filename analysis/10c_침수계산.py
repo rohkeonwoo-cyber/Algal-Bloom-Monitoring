@@ -1,4 +1,4 @@
-"""관측 수위로 침수범위를 계산한다 (창녕함안보~합천창녕보, dfe 74~117 km).
+"""관측 수위로 침수범위를 계산한다 (낙동강 본류 전 구간, dfe 0~268 km).
 
 방법 — 지형 기반 근사이며 수리모형이 아니다.
   1) 해발표고 = 관측수위 + gdt (10b_영점표고검증.py 에서 확인:
@@ -9,6 +9,8 @@
   4) 하도와 연결되지 않은 고립 저지대는 제외한다(분지에 물이 고이는 가짜 침수 방지).
 
 한계 (반드시 함께 표기)
+  - **하구둑 담수역(pool 0, dfe 0~74 km)은 조위와 하구둑 운영의 영향을 받는다.**
+    수면을 종단으로 늘린 정적 근사가 다른 구간보다 더 부정확하다.
   - Copernicus DEM GLO-30 은 **DSM** 이라 수목·건물 높이가 표고에 포함된다 →
     식생 우거진 홍수터의 표고를 과대평가해 침수를 과소추정한다.
   - 30 m 해상도로는 제방·도로 같은 선형 구조물을 해상하지 못한다.
@@ -39,7 +41,7 @@ MORPH = BASE.parent
 WORK = BASE / "work"
 DATA = pathlib.Path("/home/gw/Algal-Bloom-Monitoring/data")
 
-S_LO, S_HI = 74.0, 117.0
+S_LO, S_HI = 0.0, 268.0
 MAX_DIST_M = 15000          # 하도에서 이보다 먼 곳은 판단 대상에서 제외
 GAUGE_MAX_DIST_KM = 2.0     # 본류 관측소로 인정할 중심선 거리
 
@@ -136,7 +138,13 @@ def main():
             "monotonic_adjustments": adj,
         }
         if gsw is not None:
-            rec.update(gsw_check(flood, gsw, channel))
+            rec.update(gsw_check(flood, gsw, channel, inrange, near_pool))
+        # 담수역별 침수면적 — 268 km 전체에서 어디가 취약한지 보려면 나눠야 한다
+        by_pool = {}
+        for pool in sorted(set(pool_grid[channel].tolist())):
+            m = flood & (near_pool == pool)
+            by_pool[str(pool)] = round(float(m.sum() * px * px / 1e6), 2)
+        rec["area_by_pool_km2"] = by_pool
         results.append(rec)
         exports[key] = depth
         print(f"\n[{label}] 수면 EL {rec['wse_range'][0]}~{rec['wse_range'][1]} m")
@@ -150,7 +158,7 @@ def main():
             print(f"  GSW 대조: 상시수면 재현율 {rec['gsw_permanent_recall']}% · "
                   f"침수역 중 GSW 수면흔적 있는 비율 {rec['gsw_any_precision']}%")
 
-    ch = channel_facts(dem, channel, seg, gauges)
+    ch = channel_facts(dem, channel, seg, gauges, pool_grid)
     print(f"\n하도 DEM 진단: 중위표고 {ch['dem_median_el_m']} m, 표준편차 {ch['dem_sd_m']} m "
           f"→ {'수면으로 판단' if ch['dem_is_water_surface'] else '하상 가능성'}")
     print(f"  담수역 평균수심(06_기초통계 §7) {ch['pool_mean_depth_m']} m "
@@ -197,23 +205,32 @@ def isotonic_nondecreasing(y):
     return np.array(out)
 
 
-def channel_facts(dem, channel, seg, gauges):
+def channel_facts(dem, channel, seg, gauges, pool_grid_g):
     """하도 안의 DEM 이 하상인지 수면인지 진단한다.
 
     Copernicus DEM 은 TanDEM-X 레이더 기반이고 레이더는 물을 투과하지 못한다.
     따라서 하도 화소의 값은 하상이 아니라 **촬영 당시 수면**일 가능성이 높다.
     43 km 구간에서 표고가 거의 변하지 않으면(여울·소가 안 보이면) 수면으로 본다.
     """
+    # 전 구간에서는 종단경사(하구 0 m → 상류 50 m)가 표준편차를 지배해
+    # 전역 표준편차로는 "하상인가 수면인가" 를 판정할 수 없다(1차 계산에서 13.37 m).
+    # 담수역 안에서는 수면이 거의 수평이므로, 담수역별 표준편차의 중위값을 본다.
     v = dem[channel]
     v = v[np.isfinite(v)]
-    sd = float(v.std())
     med = float(np.median(v))
+    sds = []
+    for pool in sorted(set(pool_grid_g[channel].tolist())):
+        vv = dem[channel & (pool_grid_g == pool)]
+        vv = vv[np.isfinite(vv)]
+        if vv.size > 200:
+            sds.append(float(vv.std()))
+    sd = float(np.median(sds)) if sds else float(v.std())
     # 06_기초통계.md §7: 구간별 수심 자료는 없고 담수역 평균수심만 산정 가능
     pool_depth = float(np.nanmedian(seg["DEPTH_M"].values.astype(float)))
     now = [g["now"] for g in gauges if g.get("now") is not None]
     return {
         "dem_median_el_m": round(med, 2),
-        "dem_sd_m": round(sd, 2),
+        "dem_sd_m": round(sd, 2),          # 담수역 내 표준편차의 중위값
         "dem_is_water_surface": bool(sd < 2.0),
         "current_wse_median_el_m": round(float(np.median(now)), 2) if now else None,
         "pool_mean_depth_m": round(pool_depth, 2),
@@ -283,14 +300,48 @@ def load_gsw(work, tf, crs, H, W):
     return out
 
 
-def gsw_check(flood, gsw, channel):
-    """상시수면(occurrence>=90)을 얼마나 재현하는지, 침수역에 수면흔적이 있는지."""
-    perm = gsw["occurrence"] >= 90
-    anyw = gsw["occurrence"] >= 5
-    recall = 100 * (flood & perm).sum() / max(perm.sum(), 1)
-    prec = 100 * (flood & anyw).sum() / max(flood.sum(), 1)
-    return {"gsw_permanent_recall": round(float(recall), 1),
-            "gsw_any_precision": round(float(prec), 1)}
+def sea_mask(perm):
+    """바다를 골라낸다.
+
+    전 구간 bbox 는 부산 남쪽 해역까지 포함한다. 그대로 두면 GSW 상시수면의
+    대부분이 바다가 되어 '재현율' 분모를 잠식한다(전 구간 1차 계산에서 2.9% 로
+    붕괴한 원인). 바다는 bbox 경계에 닿는 하나의 연결된 수체이므로,
+    경계에 닿는 상시수면 덩어리를 바다로 보고 제외한다. 하천은 경계에 닿지 않는다.
+    """
+    lab, n = ndimage.label(perm, structure=np.ones((3, 3), dtype=bool))
+    if n == 0:
+        return np.zeros_like(perm)
+    edge = np.concatenate([lab[0, :], lab[-1, :], lab[:, 0], lab[:, -1]])
+    edge = np.unique(edge)
+    edge = edge[edge > 0]
+    return np.isin(lab, edge)
+
+
+def gsw_check(flood, gsw, channel, inrange, near_pool):
+    """상시수면(occurrence>=90)을 얼마나 재현하는지, 침수역에 수면흔적이 있는지.
+
+    비교 범위는 우리가 판단한 영역(하도 15 km 이내)으로 한정하고 바다는 뺀다.
+    담수역별로도 남긴다 — 하구둑 담수역은 조위 영향으로 정적 근사가 특히 약해서
+    전체 한 숫자로 뭉치면 그 약점이 가려진다.
+    """
+    perm = (gsw["occurrence"] >= 90) & inrange
+    sea = sea_mask(gsw["occurrence"] >= 90)
+    perm = perm & ~sea
+    anyw = (gsw["occurrence"] >= 5) & inrange & ~sea
+    out = {
+        "gsw_permanent_recall": round(float(100 * (flood & perm).sum() / max(perm.sum(), 1)), 1),
+        "gsw_any_precision": round(float(100 * (flood & anyw).sum() / max(flood.sum(), 1)), 1),
+        "gsw_permanent_km2": round(float(perm.sum() * 900 / 1e6), 1),
+        "gsw_sea_excluded_km2": round(float(sea.sum() * 900 / 1e6), 1),
+        "gsw_recall_by_pool": {},
+    }
+    for pool in sorted(set(near_pool[channel].tolist())):
+        m = perm & (near_pool == pool)
+        if m.sum() < 100:
+            continue
+        out["gsw_recall_by_pool"][str(pool)] = round(
+            float(100 * (flood & m).sum() / m.sum()), 1)
+    return out
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ float 배열을 그대로 보내는 것보다 훨씬 작다. 단, 브라우저 c
 실행: .venv/bin/python 10_flood/10d_웹출력.py
 """
 import json
+import math
 import pathlib
 import warnings
 
@@ -30,8 +31,12 @@ WORK = BASE / "work"
 OUT = BASE.parent / "09_manuscript" / "dashboard" / "flood"
 OUT.mkdir(parents=True, exist_ok=True)
 
-DOWN = 1            # 1 = DEM 원해상도(30 m) 그대로. 뷰어가 필요하면 더 솎아 쓴다
-TEX_MAX = 4608      # 위성 텍스처 한 변 최대 화소 (Sentinel-2 원해상도 10 m 에 맞춤)
+# 전 구간(93×181 km)을 30 m 로 세우면 정점 2,000만개(700 MB)로 브라우저가 못 버틴다.
+# 계산은 30 m 로 하고 화면 격자만 90 m 로 솎는다(정점 220만개, 시범 구간 때와 비슷).
+DOWN = 3
+# 전 구간은 폭이 93 km 라 10 m/화소면 9,300 화소가 필요하고 용량이 20 MB 를 넘는다.
+# 넓게 볼 때의 배경만 담당하면 되고(확대하면 브이월드 항공영상이 덮는다) 3,300 으로 둔다.
+TEX_MAX = 2600
 MAX_DIST_VIEW = 15000   # 10c 의 판단 반경과 같게 (뷰어 슬라이더 상한)
 
 
@@ -129,7 +134,18 @@ def window_for(src, bounds, crs):
     try:
         b = transform_bounds(crs, src.crs, bounds.left, bounds.bottom,
                              bounds.right, bounds.top, densify_pts=21)
-        return win_from_bounds(*b, transform=src.transform).round_offsets().round_lengths()
+        # **장면 실제 범위로 잘라야 한다.** bbox 를 그대로 창으로 쓰면 bbox 의 일부만
+        # 덮는 장면에서도 bbox 전체 크기(12,000²)의 배열을 읽게 되어, 전 구간 1차
+        # 시도에서 18분이 지나도 끝나지 않았다.
+        from rasterio.windows import Window
+        w = win_from_bounds(*b, transform=src.transform)
+        col0 = max(0, int(math.floor(w.col_off)))
+        row0 = max(0, int(math.floor(w.row_off)))
+        col1 = min(src.width, int(math.ceil(w.col_off + w.width)))
+        row1 = min(src.height, int(math.ceil(w.row_off + w.height)))
+        if col1 <= col0 or row1 <= row0:
+            return None
+        return Window(col0, row0, col1 - col0, row1 - row0)
     except Exception:
         return None
 
@@ -173,8 +189,33 @@ def fetch_texture(bounds, crs, W, H):
     if not items:
         print("위성 텍스처: 조건에 맞는 장면 없음 — 텍스처 없이 진행")
         return None
-    items.sort(key=lambda it: it.properties.get("eo:cloud_cover", 100))
-    print(f"위성 후보 {len(items)}장, 최저운량 {items[0].properties.get('eo:cloud_cover'):.1f}%")
+    # 전 구간은 여러 MGRS 타일에 걸친다. 운량만으로 고르면 한 타일의 장면 여러 개를
+    # 집어와 다른 지역이 비어 버리므로, 타일별로 가장 맑은 장면을 하나씩 고른다.
+    # **타일만으로 묶으면 안 된다.** Sentinel-2 granule 은 궤도 경계에서 타일의 절반만
+    # 채워 오는 경우가 있어, 타일별 최맑음 1장만 쓰면 반쪽이 빈다(전 구간 1차 시도에서
+    # 커버리지 83.9% 에 멈춘 원인 — 상·하단 1/4 이 각각 28% 씩 비었다).
+    # 타일 × 상대궤도 조합으로 묶으면 서로 반대쪽을 메운다.
+    best = {}
+    for it in items:
+        tile = it.properties.get("s2:mgrs_tile") or it.id.split("_")[-2]
+        orbit = it.properties.get("sat:relative_orbit") or it.id.split("_")[-3]
+        k = (tile, orbit)
+        cc = it.properties.get("eo:cloud_cover", 100)
+        if k not in best or cc < best[k].properties.get("eo:cloud_cover", 100):
+            best[k] = it
+    first = sorted(best.values(), key=lambda it: it.properties.get("eo:cloud_cover", 100))
+    print(f"타일×궤도 {len(first)}개: "
+          + ", ".join(f"{(it.properties.get('s2:mgrs_tile') or '?')}"
+                      f"/R{it.properties.get('sat:relative_orbit', '?')}"
+                      f"({it.properties.get('eo:cloud_cover', -1):.1f}%)" for it in first))
+    # 타일별 1장만으로는 다 덮이지 않는다(궤도 경계에서 장면이 타일을 꽉 채우지 않음 —
+    # 1차 시도에서 6장으로 83.8% 에 멈췄다). 먼저 타일별 최맑음으로 넓게 깔고,
+    # 남은 장면을 운량 순으로 계속 덧대 빈 곳을 메운다.
+    chosen = {it.id for it in first}
+    rest = sorted((it for it in items if it.id not in chosen),
+                  key=lambda it: it.properties.get("eo:cloud_cover", 100))
+    items = first + rest
+    print(f"  보조 장면 {len(rest)}개 대기 (빈 곳이 남으면 순서대로 덧댄다)")
 
     tw = min(TEX_MAX, round((bounds.right - bounds.left) / 10))   # 10 m/화소 상한
     th = int(round(tw * H / W))
@@ -184,7 +225,7 @@ def fetch_texture(bounds, crs, W, H):
     acc = np.zeros((3, th, tw), dtype="float32")
     cnt = np.zeros((3, th, tw), dtype="float32")[0]
     used = []
-    for it in items[:6]:
+    for it in items[:20]:
         try:
             with rasterio.open(it.assets["visual"].href) as src:
                 # 타일 전체(10980²)를 끌어오지 않고, 필요한 구역만 창으로 읽는다.
@@ -195,7 +236,7 @@ def fetch_texture(bounds, crs, W, H):
                 sh = int(win.height); sw = int(win.width)
                 if sw < 1 or sh < 1:
                     continue
-                cap = 2 * max(tw, th)                     # 과도한 전송 방지
+                cap = 3000                                # 과도한 전송 방지
                 if max(sw, sh) > cap:
                     k = cap / max(sw, sh)
                     sw, sh = max(1, int(sw * k)), max(1, int(sh * k))
@@ -215,11 +256,18 @@ def fetch_texture(bounds, crs, W, H):
         used.append({"id": it.id, "date": it.properties["datetime"][:10],
                      "cloud": round(it.properties.get("eo:cloud_cover", -1), 1)})
         print(f"  {it.id[:34]} {it.properties['datetime'][:10]} 누적 {100*(cnt>0).mean():.1f}%")
-        if (cnt > 0).mean() > 0.995:
+        # 남쪽 해역은 ESA 가 순수 해양 타일을 생산하지 않아 영상이 없다.
+        # 육지가 다 덮이면 84% 선에서 더 늘지 않으므로 여기서 멈춘다.
+        if (cnt > 0).mean() > 0.97:
             break
+    if (cnt > 0).mean() <= 0.995:
+        print(f"  경고: 최종 커버리지 {100*(cnt>0).mean():.1f}% — 빈 곳이 남았다")
     if not used:
         return None
-    img = np.where(cnt > 0, acc / np.maximum(cnt, 1), 0).astype("uint8")
+    # 영상이 없는 곳(= 해역)은 검정으로 두면 구멍처럼 보인다. 바다색으로 채운다.
+    SEA = np.array([92, 115, 131], dtype="float32")
+    img = np.where(cnt > 0, acc / np.maximum(cnt, 1),
+                   SEA[:, None, None]).astype("uint8")
     # 품질 80 + 기본 크로마 서브샘플링(4:2:0)은 식생처럼 잔무늬가 많은 면에서
     # 눈에 띄게 뭉갠다. 지형 텍스처는 확대해서 보는 용도이므로 서브샘플링을 끄고
     # 품질을 올린다(용량 증가는 감수).

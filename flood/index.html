@@ -135,6 +135,18 @@
     <div class="stat"><b class="mono" id="stMax">–</b><span>최대수심 m</span></div>
   </div>
 
+  <h2>녹조 (Chl-a 초과빈도)</h2>
+  <div class="scen" id="chlaMode">
+    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span></button>
+    <button data-m="all"><i style="background:#b73b8b"></i><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
+    <button data-m="jja"><i style="background:#981e70"></i><span class="nm">여름(JJA)</span><span class="km2 mono" id="chlaJjaR">–</span></button>
+  </div>
+  <div class="swatches" id="chlaSwatches" style="background:#20333a"></div>
+  <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
+  <div class="swnote">Sentinel-2 추정 Chl-a 가 25 mg/m³ 를 넘은 관측일 비율.
+    2019–2025, 200 m 구간 1,340개. 논문·대시보드와 같은 값입니다.</div>
+  <div class="swnote" id="algaeNote" style="margin-top:6px">–</div>
+
   <h2>수심</h2>
   <div class="swatches" id="depthSwatches"></div>
   <div class="swlabels"><span>0 m</span><span id="swMid">–</span><span id="swMax">–</span></div>
@@ -299,7 +311,7 @@ function decodeRGB16(img){
   return {w:c.width, h:c.height, v:out};
 }
 
-let META, TERR, DIST = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
+let META, TERR, DIST = null, CHLA = null, ALGAE_NOW = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
 let vex = 3, waterOpacity = 1.0, current = null, distLimit = Infinity;
 let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 
@@ -321,6 +333,15 @@ let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
     terrainImg = await loadImage("terrain.png"); step("지형 격자 해석 중…");
     if(meta.texture){ texImg = await loadImage(meta.texture.file); step("위성영상 적용 중…"); }
     if(meta.dist_file){ DIST = decodeRGB16(await loadImage(meta.dist_file)); }
+    // 녹조 레이어와 조류경보 현황 — 실패해도 침수 기능은 그대로 쓸 수 있어야 한다
+    try{
+      const r = await fetch("chla.json", {cache:"no-store"});
+      if(r.ok) CHLA = await r.json();
+    }catch(e){ CHLA = null; }
+    try{
+      const r = await fetch("../data/algae_latest.json", {cache:"no-store"});
+      if(r.ok) ALGAE_NOW = await r.json();
+    }catch(e){ ALGAE_NOW = null; }
     for(const s of meta.scenarios){
       DEPTHS[s.key] = decodeRGB16(await loadImage(s.file));
       step(`침수 시나리오 ${s.label} 읽는 중…`);
@@ -336,6 +357,8 @@ let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
   buildScene(meta, texImg);
   const want = new URLSearchParams(location.search).get("s");
   select(meta.scenarios.some(x => x.key === want) ? want : meta.scenarios[0].key);
+  buildChla();
+  drawAlgaeStations();
   el("loading").remove();
   animate();
 })();
@@ -653,6 +676,134 @@ function scheduleDetail(){
   }), 450);
 }
 
+/* ---- 녹조(Chl-a) 리본 ----
+   순차형이므로 단일 색상(자홍) 명도 순차. 지도 위에 함께 나오는 물(파랑)·지형(초록·갈색·
+   회색)과의 최소 색차 dE 14.2 를 확인하고 고른 값이다(연한 분홍은 도로·나대지의 밝은
+   회색과 dE 7 로 붙어 못 쓴다). 데이터 값을 나타내는 면이므로 조명을 받지 않게 한다 —
+   음영이 끼면 같은 값이 자리에 따라 달라 보인다. */
+const CHLA_RAMP = ["#ffa1d7","#eb7dbe","#d35ba5","#b73b8b","#981e70","#770355"];
+const RIBBON_HALF_W = 175;   // m. 하폭 중위 310 m 와 비슷한 폭으로 둔다
+const RIBBON_LIFT = 6;       // m. 수면 위로 살짝 띄워 물에 가리지 않게
+
+let chlaMesh = null, chlaMode = "all";
+
+function xy5186ToWorld(x, y){
+  return [x - X5186_0 - SPANX/2, (Y5186_0 - y) - SPANZ/2];
+}
+function elevAtWorld(wx, wz){
+  const c = Math.round((wx + SPANX/2) / RES), r = Math.round((wz + SPANZ/2) / RES);
+  if(c < 0 || r < 0 || c >= GW || r >= GH) return null;
+  return elevRender(r * GW + c);
+}
+function chlaColor(v, lo, hi){
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-6, hi - lo)));
+  const f = t * (CHLA_RAMP.length - 1);
+  const i = Math.min(CHLA_RAMP.length - 2, Math.floor(f));
+  return new THREE.Color(CHLA_RAMP[i]).lerp(new THREE.Color(CHLA_RAMP[i+1]), f - i);
+}
+
+// 조류경보 4지점 — 현재 등급을 색으로 띄운다. 확대해도 화면상 크기가 유지되게 배율을 맞춘다.
+const ALGAE_LV_FILL = {"정상":"#7e8984","관심":"#ffd95a","경계":"#b8381a","대발생":"#6e040b"};
+const algaeMarks = [];
+function drawAlgaeStations(){
+  if(!CHLA) return;
+  const rows = (ALGAE_NOW && ALGAE_NOW.rows) ? ALGAE_NOW.rows : [];
+  CHLA.stations.forEach(st=>{
+    const [wx, wz] = xy5186ToWorld(st.x, st.y);
+    const y = elevAtWorld(wx, wz);
+    if(y === null) return;
+    const r = rows.find(x => x.station === st.name);
+    const lv = r && r.level ? r.level : null;
+    const fill = new THREE.Color(lv ? (ALGAE_LV_FILL[lv] || "#7e8984") : "#5f7079");
+    const grp = new THREE.Group();
+    grp.position.set(wx, y + RIBBON_LIFT, wz);
+    const head = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0),
+      new THREE.MeshBasicMaterial({color: fill}));
+    head.position.y = 2.4;
+    grp.add(head);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6),
+      new THREE.MeshBasicMaterial({color: fill}));
+    stem.position.y = 1.2;
+    grp.add(stem);
+    grp.userData = {name: st.name, level: lv,
+      cells: r && r.cell_count != null ? Math.round(r.cell_count).toLocaleString() : null,
+      date: r && r.date ? r.date : null, approx: st.approx, basis: st.basis};
+    group.add(grp);
+    algaeMarks.push(grp);
+  });
+  scaleAlgae();
+  el("algaeNote").textContent =
+    `조류경보 ${algaeMarks.length}지점 표시 · ` +
+    (ALGAE_NOW ? "현재 등급 반영" : "등급 자료 없음(침수 기능은 정상)");
+}
+// 넓게 볼 때는 리본이 침수 수면(최대 14 m)에 가려 안 보인다. 보는 거리에 따라
+// 지면 위로 띄워, 전체 보기에서는 강 위에 떠 있는 띠로 읽히게 한다.
+function liftChla(){
+  if(!chlaMesh) return;
+  chlaMesh.position.y = Math.max(8, Math.min(320, orbit.dist * 0.0016));
+}
+
+function scaleAlgae(){
+  // 핀 전체 높이가 화면 높이의 1% 쯤 되게 맞춘다(local 단위로 약 3.4).
+  // SPANX(98 km) 비례로 잡았더니 전 구간 보기에서 산만큼 커졌다.
+  const k = Math.max(SPANX * 0.0012, Math.min(SPANX * 0.006, orbit.dist * 0.0030));
+  for(const g of algaeMarks) g.scale.setScalar(k);
+}
+
+function buildChla(){
+  if(chlaMesh){ group.remove(chlaMesh); chlaMesh.geometry.dispose(); chlaMesh.material.dispose(); chlaMesh = null; }
+  if(!CHLA || chlaMode === "off") return;
+  const key = chlaMode;
+  const segs = CHLA.segments.map(s=>{
+    const [wx, wz] = xy5186ToWorld(s.x, s.y);
+    return {wx, wz, v: s[key], y: elevAtWorld(wx, wz)};
+  }).filter(s => s.y !== null);
+  const rng = key === "jja" ? CHLA.range_jja : CHLA.range_all;
+  const [lo, hi] = rng;
+
+  // 인접 구간이 같은 꼭짓점을 쓰도록 이등분 법선을 계산한다(굽이에서 톱니가 생기지 않게)
+  const nx = new Float32Array(segs.length), nz = new Float32Array(segs.length);
+  for(let i = 0; i < segs.length; i++){
+    let dx, dz;
+    const a = segs[Math.max(0, i-1)], b = segs[Math.min(segs.length-1, i+1)];
+    dx = b.wx - a.wx; dz = b.wz - a.wz;
+    const L = Math.hypot(dx, dz) || 1;
+    nx[i] = -dz / L; nz[i] = dx / L;
+  }
+  const pos = [], col = [], idx = [];
+  const vi = new Int32Array(segs.length).fill(-1);
+  for(let i = 0; i < segs.length; i++){
+    const s = segs[i];
+    if(s.v === null || s.v === undefined) continue;
+    vi[i] = pos.length / 3 / 2;
+    const c = chlaColor(s.v, lo, hi);
+    for(const sg of [1, -1]){
+      pos.push(s.wx + nx[i]*RIBBON_HALF_W*sg, s.y + RIBBON_LIFT, s.wz + nz[i]*RIBBON_HALF_W*sg);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  for(let i = 0; i + 1 < segs.length; i++){
+    if(vi[i] < 0 || vi[i+1] < 0) continue;              // 값 없는 구간은 잇지 않는다
+    if(Math.hypot(segs[i+1].wx - segs[i].wx, segs[i+1].wz - segs[i].wz) > 800) continue;
+    const a = vi[i]*2, b = a+1, c2 = vi[i+1]*2, d = c2+1;
+    idx.push(a, c2, b, b, c2, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  chlaMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    vertexColors:true, side:THREE.DoubleSide, depthWrite:false }));
+  chlaMesh.renderOrder = 2;
+  group.add(chlaMesh);
+  liftChla();
+
+  el("chlaSwatches").innerHTML = `<i style="position:absolute;inset:0;background:linear-gradient(90deg,${CHLA_RAMP.join(",")})"></i>`;
+  el("chlaLo").textContent = lo.toFixed(0) + "%";
+  el("chlaMid").textContent = ((lo+hi)/2).toFixed(0) + "%";
+  el("chlaHi").textContent = hi.toFixed(0) + "%";
+}
+
 // 지형 메시. PlaneGeometry 대신 직접 만들어 격자 간격(meshStep)을 고를 수 있게 한다 —
 // 원본 30 m 격자는 정점 246만개라 약한 기기에서는 버겁다.
 function buildTerrain(){
@@ -764,6 +915,8 @@ function applyCamera(){
     target.z + dist * Math.cos(phi) * Math.cos(theta));
   camera.lookAt(target);
   if(typeof scheduleDetail === "function") scheduleDetail();
+  if(typeof scaleAlgae === "function") scaleAlgae();
+  if(typeof liftChla === "function") liftChla();
 }
 function setupControls(spanX){
   const dom = renderer.domElement;
@@ -918,7 +1071,8 @@ function animate(){
 // ---------- UI ----------
 function buildUI(meta){
   el("reachLabel").textContent =
-    `창녕함안보~합천창녕보 (종단 ${meta.reach.s_lo}~${meta.reach.s_hi} km) · 격자 ${meta.res_m} m`;
+    `낙동강 본류 전 구간 (하구둑~영강합류부, 종단 ${meta.reach.s_lo}~${meta.reach.s_hi} km)`
+    + ` · 지형격자 ${meta.res_m} m`;
 
   const list = el("scenList");
   meta.scenarios.forEach(s=>{
@@ -932,15 +1086,32 @@ function buildUI(meta){
     list.appendChild(b);
   });
 
+  if(CHLA){
+    el("chlaAllR").textContent = `${CHLA.range_all[0]}~${CHLA.range_all[1]}%`;
+    el("chlaJjaR").textContent = `${CHLA.range_jja[0]}~${CHLA.range_jja[1]}%`;
+    const btns = document.querySelectorAll("#chlaMode button");
+    const syncChla = ()=> btns.forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.m === chlaMode)));
+    btns.forEach(b => b.addEventListener("click", ()=>{
+      chlaMode = b.dataset.m; syncChla(); buildChla();
+    }));
+    syncChla();
+  } else {
+    el("chlaMode").innerHTML = `<div class="ro-none">녹조 자료(chla.json)를 불러오지 못했습니다.</div>`;
+  }
+
   const go = el("goto");
-  (meta.gauges || []).filter(g => g.x !== undefined)
-    .sort((a, b) => a.s - b.s)
-    .forEach(g=>{
-      const o = document.createElement("option");
-      o.value = `${g.x},${g.y}`;
-      o.textContent = `${g.name} · ${g.s.toFixed(1)}km`;
-      go.appendChild(o);
-    });
+  const goItems = [];
+  (CHLA ? CHLA.stations : []).forEach(s =>
+    goItems.push({x:s.x, y:s.y, s:s.s, label:`◆ ${s.name} (조류경보) · ${s.s.toFixed(1)}km`}));
+  (meta.gauges || []).filter(g => g.x !== undefined).forEach(g =>
+    goItems.push({x:g.x, y:g.y, s:g.s, label:`${g.name} · ${g.s.toFixed(1)}km`}));
+  goItems.sort((a, b) => a.s - b.s).forEach(it=>{
+    const o = document.createElement("option");
+    o.value = `${it.x},${it.y}`;
+    o.textContent = it.label;
+    go.appendChild(o);
+  });
   go.addEventListener("change", ()=>{
     if(!go.value){ frameCamera(SPANX, SPANZ); return; }   // 전체 보기로 복귀
     const [gx, gy] = go.value.split(",").map(Number);
