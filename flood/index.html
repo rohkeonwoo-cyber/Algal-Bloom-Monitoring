@@ -138,6 +138,17 @@
     <span class="val mono" id="vexVal">3×</span>
   </div>
   <div class="ctl">
+    <label for="vwOn">항공영상</label>
+    <button id="vwOn" style="flex:1; all:unset; cursor:pointer; text-align:center;
+            border:1px solid var(--border); border-radius:7px; padding:4px 6px;
+            font-size:11.5px; background:var(--surface-2); color:var(--ink-1);"
+            aria-pressed="false">브이월드 0.24 m</button>
+  </div>
+  <div class="ctl" style="justify-content:space-between">
+    <span id="vwStat" style="font-size:10.5px; line-height:1.5">–</span>
+  </div>
+
+  <div class="ctl">
     <label for="mres">지형 해상도</label>
     <select id="mres" style="flex:1; background:var(--surface-2); color:var(--ink-1);
             border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-size:11.5px;">
@@ -181,6 +192,7 @@
   <div class="bar"><i id="loadBar"></i></div>
 </div>
 
+<script src="vworld-key.js" onerror="window.VWORLD_KEY=null"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -318,6 +330,9 @@ function buildScene(meta, texImg){
   const res = meta.res_m;
   const spanX = (w - 1) * res, spanZ = (h - 1) * res;
   GW = w; GH = h; RES = res; SPANX = spanX; SPANZ = spanZ;
+  // meta.bounds_5186 은 래스터 외곽이고 정점은 화소 중심이므로 반 화소 안쪽이다
+  X5186_0 = meta.bounds_5186[0] + res/2;
+  Y5186_0 = meta.bounds_5186[3] - res/2;
   // 246만 정점을 모든 기기가 감당하지는 못한다. 화면이 좁으면 절반 밀도로 시작한다.
   meshStep = (innerWidth < 900 || (navigator.deviceMemory || 8) < 4) ? 2 : 1;
 
@@ -339,17 +354,57 @@ function buildScene(meta, texImg){
   group = new THREE.Group();
   scene.add(group);
 
-  terrainMat = new THREE.MeshLambertMaterial({color:0xffffff});
+  let baseTex = null;
   if(texImg){
-    const tex = new THREE.Texture(texImg);
-    tex.needsUpdate = true;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.generateMipmaps = true;
-    terrainMat.map = tex;
-  } else {
-    terrainMat.color = new THREE.Color(0x5d6b60);
+    baseTex = new THREE.Texture(texImg);
+    baseTex.needsUpdate = true;
+    baseTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    baseTex.minFilter = THREE.LinearMipmapLinearFilter;
+    baseTex.generateMipmaps = true;
   }
+  // 지형 재질을 직접 쓰는 이유: 넓게 보는 배경(Sentinel-2)과 확대했을 때만 받아오는
+  // 상세 항공영상(브이월드)을 한 면에 합성해야 하는데, 표준 재질로는 두 텍스처를
+  // 서로 다른 좌표계(격자 UV / Web Mercator)로 섞을 수 없다.
+  terrainMat = new THREE.ShaderMaterial({
+    uniforms:{
+      uBase:{value: baseTex},
+      uDetail:{value: null},
+      uRect:{value: new THREE.Vector4(0, 0, 1, 1)},   // 상세영상이 덮는 정규 메르카토르 범위
+      uHasDetail:{value: 0},
+      uHasBase:{value: baseTex ? 1 : 0},
+      uVex:{value: vex},
+      uLightDir:{value: new THREE.Vector3(-1, 1.6, 0.7).normalize()},
+    },
+    vertexShader:`
+      attribute vec2 aMerc;
+      uniform float uVex;
+      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw;
+      void main(){
+        vUv = uv; vMerc = aMerc;
+        // 정점은 과장 전 표고로 놓고 그룹 스케일(0,vex,0)로 늘린다 →
+        // 법선은 스케일의 역수를 곱해야 맞다(diag(1,1/vex,1)).
+        vNw = normalize(vec3(normal.x, normal.y / uVex, normal.z));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader:`
+      uniform sampler2D uBase; uniform sampler2D uDetail;
+      uniform vec4 uRect; uniform float uHasDetail; uniform float uHasBase;
+      uniform vec3 uLightDir;
+      varying vec2 vUv; varying vec2 vMerc; varying vec3 vNw;
+      void main(){
+        vec3 c = uHasBase > 0.5 ? texture2D(uBase, vUv).rgb : vec3(0.36, 0.42, 0.38);
+        if(uHasDetail > 0.5){
+          vec2 d = (vMerc - uRect.xy) / (uRect.zw - uRect.xy);
+          if(d.x > 0.0 && d.x < 1.0 && d.y > 0.0 && d.y < 1.0){
+            float e = min(min(d.x, 1.0 - d.x), min(d.y, 1.0 - d.y));
+            c = mix(c, texture2D(uDetail, d).rgb, smoothstep(0.0, 0.02, e));
+          }
+        }
+        // AmbientLight(0.62) + DirectionalLight(0.85) 와 같은 값
+        float diff = max(dot(normalize(vNw), uLightDir), 0.0);
+        gl_FragColor = vec4(c * (0.62 + 0.85 * diff), 1.0);
+      }`,
+  });
   buildTerrain();
 
   group.scale.y = vex;
@@ -362,6 +417,171 @@ function buildScene(meta, texImg){
   setupControls(spanX);
 }
 
+
+/* =======================================================================
+   브이월드 항공영상 상세 텍스처
+   배경은 Sentinel-2(10 m) 한 장을 그대로 쓰고, 확대했을 때만 보이는 범위에
+   해당하는 브이월드 타일(최대 0.24 m)을 받아 그 부분만 덮어쓴다.
+   구간 전체를 0.24 m 로 담으면 180,736×195,584 화소(175 GB)라 GPU 한계(16,384)를
+   한참 넘기 때문에, "한 장을 유지하되 보는 범위만 갈아끼우는" 방식을 쓴다.
+   ======================================================================= */
+const VW = {
+  key: (typeof window.VWORLD_KEY === "string" ? window.VWORLD_KEY.trim() : ""),
+  minZ: 14, maxZ: 19, tileSize: 256, maxTiles: 196,   // 최대 14×14 = 3584²
+  on: false, busy: false, timer: null, lastSig: "",
+  cache: new Map(),          // 같은 세션에서 본 타일은 다시 요청하지 않는다
+};
+
+// EPSG:5186 → WGS84 역투영. pyproj 와 최대 0.022 mm 일치 확인(build/좌표역투영검증.py).
+const TMI = (()=>{
+  const A = 6378137.0, FL = 1/298.257222101;
+  const E2 = 2*FL - FL*FL, EP2 = E2/(1-E2);
+  const E1 = (1 - Math.sqrt(1-E2)) / (1 + Math.sqrt(1-E2));
+  const LAT0 = 38*Math.PI/180, LON0 = 127*Math.PI/180;
+  const X0 = 200000, Y0 = 600000;
+  function M(phi){
+    return A*((1 - E2/4 - 3*E2**2/64 - 5*E2**3/256)*phi
+            - (3*E2/8 + 3*E2**2/32 + 45*E2**3/1024)*Math.sin(2*phi)
+            + (15*E2**2/256 + 45*E2**3/1024)*Math.sin(4*phi)
+            - (35*E2**3/3072)*Math.sin(6*phi));
+  }
+  const M0 = M(LAT0);
+  const MU_D = A*(1 - E2/4 - 3*E2**2/64 - 5*E2**3/256);
+  return { A, E2, EP2, E1, LON0, X0, Y0, M0, MU_D };
+})();
+
+// 한 행(같은 y)에 대해 위도 관련 항을 한 번만 계산하고, 열마다 x 만 넣는 클로저를 준다.
+function tmInverseRow(y){
+  const {A, E2, EP2, E1, LON0, X0, Y0, M0, MU_D} = TMI;
+  const mu = (M0 + (y - Y0)) / MU_D;
+  const phi1 = mu
+    + (3*E1/2 - 27*E1**3/32)*Math.sin(2*mu)
+    + (21*E1**2/16 - 55*E1**4/32)*Math.sin(4*mu)
+    + (151*E1**3/96)*Math.sin(6*mu)
+    + (1097*E1**4/512)*Math.sin(8*mu);
+  const cp = Math.cos(phi1), sp = Math.sin(phi1), tp = Math.tan(phi1);
+  const C1 = EP2*cp*cp, T1 = tp*tp;
+  const N1 = A/Math.sqrt(1 - E2*sp*sp);
+  const R1 = A*(1 - E2)/Math.pow(1 - E2*sp*sp, 1.5);
+  const k = N1*tp/R1;
+  const RAD = 180/Math.PI;
+  return function(x){
+    const D = (x - X0)/N1, D2 = D*D;
+    const lat = phi1 - k*(D2/2
+      - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*EP2)*D2*D2/24
+      + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*EP2 - 3*C1*C1)*D2*D2*D2/720);
+    const lon = LON0 + (D
+      - (1 + 2*T1 + C1)*D2*D/6
+      + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*EP2 + 24*T1*T1)*D2*D2*D/120)/cp;
+    return [lon*RAD, lat*RAD];
+  };
+}
+function mercY(latDeg){
+  const lr = latDeg*Math.PI/180;
+  return (1 - Math.log(Math.tan(lr) + 1/Math.cos(lr))/Math.PI)/2;
+}
+let X5186_0 = 0, Y5186_0 = 0;    // 정점(0,0) 의 5186 좌표(화소 중심)
+
+function tileUrl(z, x, y){
+  return `https://api.vworld.kr/req/wmts/1.0.0/${VW.key}/Satellite/${z}/${y}/${x}.jpeg`;
+}
+function loadTile(z, x, y){
+  const k = `${z}/${x}/${y}`;
+  if(VW.cache.has(k)) return VW.cache.get(k);
+  const pr = new Promise(res=>{
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = ()=> res(im);
+    im.onerror = ()=> res(null);      // 없는 타일은 건너뛴다(바다·경계 밖)
+    im.src = tileUrl(z, x, y);
+  });
+  VW.cache.set(k, pr);
+  if(VW.cache.size > 1200) VW.cache.delete(VW.cache.keys().next().value);
+  return pr;
+}
+
+function viewRegion(){
+  // 보고 있는 지점(orbit.target)을 중심으로, 확대 정도에 비례한 정사각 범위를 잡는다.
+  const half = Math.max(400, Math.min(orbit.dist * 0.5, 26000));
+  // 정점 c 는 world x = -SPANX/2 + c·RES, 5186 x = X5186_0 + c·RES 이므로
+  // 5186 x = X5186_0 + (world x + SPANX/2). z 축은 남쪽이 +이므로 부호가 반대.
+  const cx = X5186_0 + orbit.target.x + SPANX/2;
+  const cy = Y5186_0 - (orbit.target.z + SPANZ/2);
+  return {cx, cy, half};
+}
+
+async function refreshDetail(){
+  const st = el("vwStat");
+  if(!VW.on || !VW.key){ return; }
+  const {cx, cy, half} = viewRegion();
+  const row = tmInverseRow(cy);
+  const [lonC, latC] = row(cx);
+  const cosLat = Math.cos(latC*Math.PI/180);
+
+  // 줌은 "화면 화소보다 약간 더 촘촘한 수준"으로 고른다. 더 높은 줌을 써도 화면에서
+  // 구분되지 않는데 타일 수만 네 배가 되므로, 호출을 낭비하지 않는 기준이 이쪽이다.
+  const targetMpp = (2*half) / (Math.max(innerWidth, 800) * 1.3);
+  let z = 0, x0 = 0, y0 = 0, nx = 0, ny = 0;
+  for(let zz = VW.minZ; zz <= VW.maxZ; zz++){
+    const res = 156543.03392/Math.pow(2, zz)*cosLat;
+    if(res > targetMpp && zz < VW.maxZ) continue;    // 아직 화면보다 거칠면 더 확대
+    const n = Math.pow(2, zz);
+    const mx0 = (lonC + 180)/360 - (half/(cosLat*111320))/360;
+    const mx1 = (lonC + 180)/360 + (half/(cosLat*111320))/360;
+    const my0 = mercY(latC + half/110540);
+    const my1 = mercY(latC - half/110540);
+    const tx0 = Math.floor(mx0*n), tx1 = Math.floor(mx1*n);
+    const ty0 = Math.floor(my0*n), ty1 = Math.floor(my1*n);
+    const w = tx1 - tx0 + 1, h = ty1 - ty0 + 1;
+    if(w*h <= VW.maxTiles){ z = zz; x0 = tx0; y0 = ty0; nx = w; ny = h; break; }
+  }
+  if(!z){ st.textContent = "범위가 너무 넓어 항공영상을 쓰지 않습니다(배경 위성 유지)"; return; }
+
+  const sig = `${z}/${x0}/${y0}/${nx}/${ny}`;
+  if(sig === VW.lastSig || VW.busy) return;
+  VW.busy = true;
+  const mpp = 156543.03392/Math.pow(2, z)*cosLat;
+  st.textContent = `타일 ${nx*ny}장 받는 중… (줌 ${z}, ${mpp.toFixed(2)} m/화소)`;
+
+  const cv = document.createElement("canvas");
+  cv.width = nx*VW.tileSize; cv.height = ny*VW.tileSize;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#7d8f64"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const jobs = [];
+  for(let j = 0; j < ny; j++)
+    for(let i = 0; i < nx; i++)
+      jobs.push(loadTile(z, x0+i, y0+j).then(im=>{
+        if(im) ctx.drawImage(im, i*VW.tileSize, j*VW.tileSize);
+      }));
+  await Promise.all(jobs);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.flipY = false;                 // 메르카토르 y 와 캔버스 행 방향이 같다
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  const prev = terrainMat.uniforms.uDetail.value;
+  terrainMat.uniforms.uDetail.value = tex;
+  const n = Math.pow(2, z);
+  terrainMat.uniforms.uRect.value.set(x0/n, y0/n, (x0+nx)/n, (y0+ny)/n);
+  terrainMat.uniforms.uHasDetail.value = 1;
+  if(prev) prev.dispose();
+  VW.lastSig = sig; VW.busy = false;
+  st.textContent = `브이월드 줌 ${z} · ${mpp.toFixed(2)} m/화소 · 타일 ${nx*ny}장`
+    + ` (캐시 ${VW.cache.size})`;
+}
+
+function scheduleDetail(){
+  if(!VW.on) return;
+  clearTimeout(VW.timer);
+  // 움직이는 동안 요청하지 않고, 멈춘 뒤 한 번만 받는다(호출 수 절약)
+  VW.timer = setTimeout(()=> refreshDetail().catch(e=>{
+    el("vwStat").textContent = "항공영상을 받지 못했습니다: " + e.message;
+    VW.busy = false;
+  }), 450);
+}
+
 // 지형 메시. PlaneGeometry 대신 직접 만들어 격자 간격(meshStep)을 고를 수 있게 한다 —
 // 원본 30 m 격자는 정점 246만개라 약한 기기에서는 버겁다.
 function buildTerrain(){
@@ -370,9 +590,11 @@ function buildTerrain(){
   const nx = Math.floor((GW - 1) / st) + 1, ny = Math.floor((GH - 1) / st) + 1;
   const pos = new Float32Array(nx * ny * 3);
   const uv = new Float32Array(nx * ny * 2);
+  const merc = new Float32Array(nx * ny * 2);   // 정규 Web Mercator — 항공영상 합성용
   const x0 = -SPANX / 2, z0 = -SPANZ / 2;
   for(let j = 0; j < ny; j++){
     const r = Math.min(GH - 1, j * st);
+    const row = tmInverseRow(Y5186_0 - r * RES);   // 같은 행은 위도 계산을 한 번만
     for(let i = 0; i < nx; i++){
       const c = Math.min(GW - 1, i * st);
       const k = j * nx + i;
@@ -381,6 +603,9 @@ function buildTerrain(){
       pos[k*3+2] = z0 + r * RES;
       uv[k*2]   = c / (GW - 1);
       uv[k*2+1] = 1 - r / (GH - 1);
+      const ll = row(X5186_0 + c * RES);
+      merc[k*2]   = (ll[0] + 180) / 360;
+      merc[k*2+1] = mercY(ll[1]);
     }
   }
   const idx = new (nx*ny > 65535 ? Uint32Array : Uint16Array)((nx-1)*(ny-1)*6);
@@ -395,6 +620,7 @@ function buildTerrain(){
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  g.setAttribute("aMerc", new THREE.BufferAttribute(merc, 2));
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.computeVertexNormals();
   terrainMesh = new THREE.Mesh(g, terrainMat);
@@ -465,6 +691,7 @@ function applyCamera(){
     target.y + dist * Math.sin(phi),
     target.z + dist * Math.cos(phi) * Math.cos(theta));
   camera.lookAt(target);
+  if(typeof scheduleDetail === "function") scheduleDetail();
 }
 function setupControls(spanX){
   const dom = renderer.domElement;
@@ -604,6 +831,25 @@ function buildUI(meta){
     list.appendChild(b);
   });
 
+  const vwBtn = el("vwOn"), vwStat = el("vwStat");
+  if(!VW.key){
+    vwBtn.disabled = true; vwBtn.style.opacity = .45;
+    vwStat.textContent = "브이월드 인증키가 없어 배경 위성영상(10 m)만 씁니다.";
+  } else {
+    vwStat.textContent = "끄져 있음 — 켜면 확대한 범위를 항공영상으로 덮습니다.";
+    vwBtn.addEventListener("click", ()=>{
+      VW.on = !VW.on;
+      vwBtn.setAttribute("aria-pressed", String(VW.on));
+      vwBtn.style.background = VW.on ? "var(--accent-soft)" : "var(--surface-2)";
+      vwBtn.style.borderColor = VW.on ? "var(--accent)" : "var(--border)";
+      if(VW.on){ VW.lastSig = ""; refreshDetail().catch(()=>{}); }
+      else {
+        terrainMat.uniforms.uHasDetail.value = 0;
+        vwStat.textContent = "꺼짐 — 배경 위성영상(10 m)";
+      }
+    });
+  }
+
   el("mres").value = String(meshStep);
   el("mres").addEventListener("change", e=>{
     meshStep = +e.target.value;
@@ -614,6 +860,7 @@ function buildUI(meta){
     vex = +e.target.value;
     el("vexVal").textContent = vex + "×";
     if(group) group.scale.y = vex;
+    if(terrainMat && terrainMat.uniforms) terrainMat.uniforms.uVex.value = vex;
   });
   const dl = el("dlim");
   if(meta.dist_file){
