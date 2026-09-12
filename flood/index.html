@@ -118,6 +118,13 @@
   <h2>수위 시나리오</h2>
   <div class="scen" id="scenList"></div>
 
+  <h2>지점으로 가기</h2>
+  <select id="goto" style="width:100%; background:var(--surface-2); color:var(--ink-1);
+          border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px;">
+    <option value="">— 관측소 선택 —</option>
+  </select>
+  <div class="ro-none" style="margin-top:6px">전체 보기로 돌아가려면 목록 맨 위를 다시 고르세요.</div>
+
   <h2>침수 규모</h2>
   <div class="stats">
     <div class="stat"><b class="mono" id="stArea">–</b><span>침수면적 km²</span></div>
@@ -185,7 +192,7 @@
   <div id="roBody"><div class="ro-none">지형 위에 마우스를 올리면 그 지점의 수심과 표고를 읽습니다.</div></div>
 </div>
 
-<div class="hud hint">드래그 회전 · 휠 확대 · 오른쪽 드래그(또는 Shift+드래그) 이동</div>
+<div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 <b>확대</b>(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
 
 <div class="loading" id="loading">
   <p id="loadMsg">지형·침수 자료를 불러오는 중…</p>
@@ -699,9 +706,11 @@ function setupControls(spanX){
   dom.style.cursor = "grab";
   dom.addEventListener("contextmenu", e => e.preventDefault());
   dom.addEventListener("pointerdown", e=>{
-    mode = (e.button === 2 || e.shiftKey) ? "pan" : "rot";
+    // 지도를 붙잡고 끄는 느낌이 기본이 되도록 왼쪽 드래그를 이동으로 둔다.
+    // 회전은 오른쪽 드래그나 Shift+드래그.
+    mode = (e.button === 2 || e.shiftKey) ? "rot" : "pan";
     px = e.clientX; py = e.clientY;
-    dom.setPointerCapture(e.pointerId);
+    try{ dom.setPointerCapture(e.pointerId); }catch(err){}
     dom.style.cursor = "grabbing";
   });
   dom.addEventListener("pointermove", e=>{
@@ -729,10 +738,30 @@ function setupControls(spanX){
   dom.addEventListener("pointercancel", end);
   dom.addEventListener("wheel", e=>{
     e.preventDefault();
-    orbit.dist *= e.deltaY > 0 ? 1.12 : 1/1.12;
+    const zoomIn = e.deltaY < 0;
+    // 화면 중앙이 아니라 커서가 가리키는 지점 쪽으로 들어가야 원하는 곳에 닿는다
+    const g = zoomIn ? pickPoint(e.clientX, e.clientY) : null;
+    orbit.dist *= zoomIn ? 1/1.12 : 1.12;
     orbit.dist = Math.max(spanX * 0.04, Math.min(spanX * 3, orbit.dist));
+    if(g){
+      const wx = -SPANX/2 + g.c*RES, wz = -SPANZ/2 + g.r*RES;
+      const k = 0.22;                      // 한 번에 다 끌어당기면 멀미가 난다
+      orbit.target.x += (wx - orbit.target.x) * k;
+      orbit.target.z += (wz - orbit.target.z) * k;
+    }
     applyCamera();
   }, {passive:false});
+
+  // 더블클릭 한 지점을 중심으로 삼고 한 단계 들어간다
+  dom.addEventListener("dblclick", e=>{
+    const g = pickPoint(e.clientX, e.clientY);
+    if(!g) return;
+    orbit.target.set(-SPANX/2 + g.c*RES,
+                     elevAt(g.r*GW + g.c) * vex,
+                     -SPANZ/2 + g.r*RES);
+    orbit.dist = Math.max(spanX * 0.04, orbit.dist * 0.45);
+    applyCamera();
+  });
 }
 /* ---- 가리킨 지점 읽기 ----
    정점 246만개짜리 메시에 레이캐스터를 쓰면 삼각형을 전수 검사해 마우스마다 멎는다.
@@ -831,12 +860,33 @@ function buildUI(meta){
     list.appendChild(b);
   });
 
+  const go = el("goto");
+  (meta.gauges || []).filter(g => g.x !== undefined)
+    .sort((a, b) => a.s - b.s)
+    .forEach(g=>{
+      const o = document.createElement("option");
+      o.value = `${g.x},${g.y}`;
+      o.textContent = `${g.name} · ${g.s.toFixed(1)}km`;
+      go.appendChild(o);
+    });
+  go.addEventListener("change", ()=>{
+    if(!go.value){ frameCamera(SPANX, SPANZ); return; }   // 전체 보기로 복귀
+    const [gx, gy] = go.value.split(",").map(Number);
+    // 5186 → 격자 인덱스 → 화면(world) 좌표. 정점은 화소 중심에 있다.
+    const c = Math.round((gx - X5186_0) / RES), r = Math.round((Y5186_0 - gy) / RES);
+    if(c < 0 || r < 0 || c >= GW || r >= GH) return;
+    orbit.target.set(-SPANX/2 + c*RES, elevAt(r*GW + c) * vex, -SPANZ/2 + r*RES);
+    orbit.dist = SPANX * 0.09;
+    orbit.phi = 0.42;
+    applyCamera();
+  });
+
   const vwBtn = el("vwOn"), vwStat = el("vwStat");
   if(!VW.key){
     vwBtn.disabled = true; vwBtn.style.opacity = .45;
     vwStat.textContent = "브이월드 인증키가 없어 배경 위성영상(10 m)만 씁니다.";
   } else {
-    vwStat.textContent = "끄져 있음 — 켜면 확대한 범위를 항공영상으로 덮습니다.";
+    vwStat.textContent = "꺼져 있음 — 켜면 확대한 범위를 항공영상으로 덮습니다.";
     vwBtn.addEventListener("click", ()=>{
       VW.on = !VW.on;
       vwBtn.setAttribute("aria-pressed", String(VW.on));
@@ -857,9 +907,11 @@ function buildUI(meta){
     if(current) buildWater(current);   // 침수 메시도 같은 간격으로 다시 만든다
   });
   el("vex").addEventListener("input", e=>{
+    const prev = vex;
     vex = +e.target.value;
     el("vexVal").textContent = vex + "×";
     if(group) group.scale.y = vex;
+    if(orbit.target.y) { orbit.target.y = orbit.target.y / prev * vex; applyCamera(); }
     if(terrainMat && terrainMat.uniforms) terrainMat.uniforms.uVex.value = vex;
   });
   const dl = el("dlim");

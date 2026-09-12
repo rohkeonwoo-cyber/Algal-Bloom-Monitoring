@@ -88,7 +88,9 @@ def main():
         if d[i] / 1000 > GAUGE_MAX_DIST_KM:
             continue
         g = {"name": r["name"], "s": float(skm[i]), "pool": int(pid[i]),
-             "dist_km": round(d[i] / 1000, 2), "gdt": r["gdt"]}
+             "dist_km": round(d[i] / 1000, 2), "gdt": r["gdt"],
+             # 뷰어에서 "이 지점으로 가기" 를 하려면 화면좌표를 알아야 한다
+             "x": round(float(x), 1), "y": round(float(y), 1)}
         for key, _, field in SCENARIOS:
             v = r.get(field)
             g[key] = round(v + r["gdt"], 3) if v is not None and (field == "latest_wl" or v > 0) else None
