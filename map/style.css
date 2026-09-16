@@ -74,6 +74,15 @@ body{
 .mk.sel{transform:scale(1.55); z-index:3}
 .mk.pending{border-style:dashed}
 
+/* 지도를 못 띄웠을 때 — 목록은 그대로 쓸 수 있다는 것을 알려 준다 */
+.mapfail{display:flex; flex-direction:column; gap:6px; align-items:center; justify-content:center;
+         height:100%; padding:24px; text-align:center; color:var(--ink2); font-size:13px;
+         background:repeating-linear-gradient(45deg,#eef1f0,#eef1f0 10px,#e9edec 10px,#e9edec 20px)}
+.mapfail b{color:var(--ink); font-size:14px}
+.tilewarn{position:absolute; left:50%; top:12px; transform:translateX(-50%); z-index:3;
+          background:#fff6e0; border:1px solid #e4c98a; color:#6b4e12;
+          padding:7px 12px; border-radius:8px; font-size:12.5px}
+
 .detail{position:absolute; right:12px; top:12px; width:272px; z-index:3;
         background:#fff; border:1px solid var(--line); border-radius:11px;
         padding:13px 14px; box-shadow:0 6px 22px rgba(0,0,0,.13)}
