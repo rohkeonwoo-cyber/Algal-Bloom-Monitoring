@@ -342,7 +342,7 @@ function decodeRGB16(img){
   return {w:c.width, h:c.height, v:out};
 }
 
-let META, TERR, DIST = null, CHLA = null, ALGAE_NOW = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
+let META, TERR, DIST = null, SCHAN = null, CHLA = null, ALGAE_NOW = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
 let vex = 3, waterOpacity = 1.0, current = null, distLimit = Infinity;
 let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 
@@ -371,6 +371,9 @@ async function boot(){
     terrainImg = await loadImage(B + "terrain.png"); step("지형 격자 해석 중…");
     if(meta.texture){ texImg = await loadImage(B + meta.texture.file); step("위성영상 적용 중…"); }
     if(meta.dist_file){ DIST = decodeRGB16(await loadImage(B + meta.dist_file)); }
+    // 격자별 '가장 가까운 본류 지점의 종단거리' — 실시간 수위 계산에 쓴다(10i).
+    // 없으면 실시간 기능만 꺼지고 나머지는 그대로 돈다.
+    try{ SCHAN = decodeRGB16(await loadImage(B + "schan.png")); }catch(e){ SCHAN = null; }
     // 부가 자료는 실패해도 본 기능은 그대로 쓸 수 있어야 한다
     if(PAGE.chlaUrl){
       try{

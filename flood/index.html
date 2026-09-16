@@ -130,6 +130,13 @@
   .profile{margin:2px 0 4px; cursor:crosshair}
   .profile svg{display:block}
   .readout h2:not(:first-child){ margin-top:16px; }
+  /* 날짜 재생 */
+  .daybtn{padding:4px 9px; border:1px solid var(--border); border-radius:7px;
+          background:var(--surface-2); color:var(--ink-2); font:inherit; font-size:12px; cursor:pointer}
+  .daybtn:hover{border-color:var(--accent); color:var(--ink-1)}
+  .daybtn.wide{flex:1; text-align:center}
+  #dayBox .ctl{margin:4px 0}
+  #daySlider{flex:1}
 </style>
 
 <div id="stage"></div>
@@ -144,6 +151,24 @@
 <div class="hud panel left">
   <h2>수위 시나리오</h2>
   <div class="scen" id="scenList"></div>
+
+  <h2>실시간 수위</h2>
+  <div class="scen" id="liveBox">
+    <button id="liveOn"><i style="background:#2fb6bd"></i><span class="nm">관측 수위로 보기</span>
+      <span class="km2 mono" id="liveArea">–</span></button>
+  </div>
+  <div id="liveCtl" hidden>
+    <div class="ctl">
+      <button id="livePrev" class="daybtn">◀</button>
+      <input type="range" id="liveSlider" min="0" max="30" value="30">
+      <button id="liveNext" class="daybtn">▶</button>
+    </div>
+    <div class="swnote" id="liveInfo">–</div>
+    <div class="swnote"><b>관측 수위로 계산한 근사입니다.</b>
+      수면표고 = 관측수위 + 영점표고를 담수역 안에서 종단 보간하고, 지면표고와 비교해
+      수심을 냅니다. 확산 연결성은 매번 다시 판정하지 않고
+      <b>심각수위에서 물이 닿았던 범위</b> 안으로 제한합니다.</div>
+  </div>
 
   <h2>지점으로 가기</h2>
   <select id="goto" style="width:100%; background:var(--surface-2); color:var(--ink-1);
@@ -337,7 +362,7 @@ function decodeRGB16(img){
   return {w:c.width, h:c.height, v:out};
 }
 
-let META, TERR, DIST = null, CHLA = null, ALGAE_NOW = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
+let META, TERR, DIST = null, SCHAN = null, CHLA = null, ALGAE_NOW = null, DEPTHS = {}, scene, camera, renderer, terrainMesh, terrainMat, waterMesh, group;
 let vex = 3, waterOpacity = 1.0, current = null, distLimit = Infinity;
 let GW = 0, GH = 0, RES = 0, SPANX = 0, SPANZ = 0, meshStep = 1;
 
@@ -366,6 +391,9 @@ async function boot(){
     terrainImg = await loadImage(B + "terrain.png"); step("지형 격자 해석 중…");
     if(meta.texture){ texImg = await loadImage(B + meta.texture.file); step("위성영상 적용 중…"); }
     if(meta.dist_file){ DIST = decodeRGB16(await loadImage(B + meta.dist_file)); }
+    // 격자별 '가장 가까운 본류 지점의 종단거리' — 실시간 수위 계산에 쓴다(10i).
+    // 없으면 실시간 기능만 꺼지고 나머지는 그대로 돈다.
+    try{ SCHAN = decodeRGB16(await loadImage(B + "schan.png")); }catch(e){ SCHAN = null; }
     // 부가 자료는 실패해도 본 기능은 그대로 쓸 수 있어야 한다
     if(PAGE.chlaUrl){
       try{
@@ -1227,6 +1255,129 @@ function wireBuildings(){
   });
 }
 
+
+/* ---- 실시간 수위로 침수 계산 ----
+   미리 만들어 둔 5단계 시나리오 대신, **관측된 수위**로 수면을 만든다.
+
+     수면표고(EL.m) = 관측수위 + 수위표 영점표고(gdt)      ← 10b 에서 확인한 관계
+     담수역 안에서 관측소 종단거리(s)를 따라 선형보간
+     수심 = 수면표고(그 칸의 s) − 지면표고
+
+   격자마다 "가장 가까운 본류 지점의 s" 가 필요해 schan.png 를 따로 내보냈다(10i).
+
+   **한계** — 연결성 판정을 매번 다시 하지 않는다. 대신 심각수위에서 물이 닿았던 범위
+   (depth_srs > 0) 안으로 제한한다. 고립 저지대가 갑자기 잠기는 것은 막지만 수리 계산은
+   아니다. 화면에도 적는다. */
+
+const LIVE = {
+  rows: null,         // 실시간 수위 관측소
+  gauges: [],         // 이 화면 범위의 관측소 (meta.gauges 와 이름으로 연결)
+  hours: [],          // 시각 라벨
+  idx: 0,             // 지금 보고 있는 시각
+  depth: null,        // 계산된 수심 격자 (cm, uint16) — DEPTHS.live 로 꽂는다
+  ready: false,
+};
+
+function hourLabel(t0, k){
+  // t0 는 YYYYMMDDHH. k 시간 뒤의 라벨을 만든다.
+  const y = +t0.slice(0,4), mo = +t0.slice(4,6), d = +t0.slice(6,8), h = +t0.slice(8,10);
+  const dt = new Date(Date.UTC(y, mo-1, d, h) + k*3600e3);
+  const p = n => String(n).padStart(2, "0");
+  return `${p(dt.getUTCMonth()+1)}.${p(dt.getUTCDate())} ${p(dt.getUTCHours())}시`;
+}
+
+async function loadLive(){
+  const r = await fetch("../data/hrfco_waterlevel.json", {cache:"no-store"});
+  if(!r.ok) throw new Error("수위 자료 " + r.status);
+  const j = await r.json();
+  LIVE.rows = {};
+  (j.rows || []).forEach(x => { LIVE.rows[x.name] = x; });
+
+  // 이 화면에 포함된 관측소 중 계열이 있는 것만
+  LIVE.gauges = (META.gauges || [])
+    .map(g => ({...g, live: LIVE.rows[g.name]}))
+    .filter(g => g.live && Array.isArray(g.live.series) && g.gdt !== null && g.gdt !== undefined);
+  if(!LIVE.gauges.length) throw new Error("이 구간에는 실시간 수위 관측소가 없습니다");
+
+  const t0 = LIVE.gauges[0].live.series_t0;
+  const n = Math.max(...LIVE.gauges.map(g => g.live.series.length));
+  LIVE.hours = Array.from({length: n}, (_, k) => hourLabel(t0, k));
+  LIVE.idx = n - 1;
+  LIVE.ready = true;
+  return LIVE;
+}
+
+/* 담수역 안에서 s 를 따라 수면표고를 보간한다. 담수역 경계(보)를 넘어 섞지 않는다 —
+   보를 사이에 두고 수위가 다르기 때문이다(10c 와 같은 처리). */
+function wseProfile(k){
+  const byPool = new Map();
+  for(const g of LIVE.gauges){
+    const wl = g.live.series[k];
+    if(wl === null || wl === undefined) continue;
+    if(!byPool.has(g.pool)) byPool.set(g.pool, []);
+    byPool.get(g.pool).push({s: g.s, el: wl + g.gdt, name: g.name});
+  }
+  for(const arr of byPool.values()) arr.sort((a, b) => a.s - b.s);
+  return byPool;
+}
+
+function wseAt(prof, pool, s){
+  const a = prof.get(pool);
+  if(!a || !a.length) return null;
+  if(s <= a[0].s) return a[0].el;
+  if(s >= a[a.length-1].s) return a[a.length-1].el;
+  for(let i = 1; i < a.length; i++){
+    if(s <= a[i].s){
+      const t = (s - a[i-1].s) / (a[i].s - a[i-1].s);
+      return a[i-1].el + t * (a[i].el - a[i-1].el);
+    }
+  }
+  return null;
+}
+
+/* 격자별 수심을 계산해 DEPTHS.live 에 넣는다. */
+function computeLiveDepth(k){
+  if(!SCHAN || !DEPTHS.srs) return null;
+  const prof = wseProfile(k);
+  if(!prof.size) return null;
+
+  /* s → 담수역 번호: 가장 가까운 관측소의 담수역을 쓴다. 관측소는 담수역마다 있고
+     보를 경계로 나뉘므로, 구간 자료가 없는 침수 페이지에서도 이 방법이면 충분하다. */
+  const gs = LIVE.gauges.slice().sort((a, b) => a.s - b.s);
+  const poolOf = s => {
+    let best = gs[0], bd = Infinity;
+    for(const g of gs){ const d = Math.abs(g.s - s); if(d < bd){ bd = d; best = g; } }
+    return best.pool;
+  };
+
+  // s 는 0.1 km 단위로만 구분되므로, s 값마다 수면표고를 미리 계산해 표로 둔다(2,681칸).
+  const lut = new Float32Array(2681).fill(NaN);
+  for(let i = 0; i < lut.length; i++){
+    const s = i / 10, w = wseAt(prof, poolOf(s), s);
+    if(w !== null) lut[i] = w;
+  }
+
+  const n = TERR.v.length, out = new Uint16Array(n);
+  const srs = DEPTHS.srs.v, sch = SCHAN.v;
+  const es = META.elev_scale, eo = META.elev_offset_m, ds = META.depth_scale;
+  let wet = 0, maxd = 0;
+  for(let i = 0; i < n; i++){
+    if(srs[i] === 0) continue;                 // 심각수위에도 물이 닿지 않은 곳 — 제외
+    const si = sch[i];
+    if(si >= 65535) continue;
+    const w = lut[si];
+    if(!(w > -1e9)) continue;
+    const d = w - (TERR.v[i] * es + eo);
+    if(d <= 0) continue;
+    const cm = Math.min(65534, Math.round(d / ds));
+    out[i] = cm; wet++;
+    if(d > maxd) maxd = d;
+  }
+  LIVE.depth = {w: TERR.w, h: TERR.h, v: out};
+  const areaKm2 = wet * (META.res_m * META.res_m) / 1e6;
+  return {areaKm2, maxd, wet};
+}
+
 /* ---- 화면 설정(수직과장·항공영상·격자 간격·본류 거리·물 투명도) ----
    침수·녹조 두 화면이 그대로 공유한다. 격자 간격이나 표시 범위가 바뀌면 각 페이지가
    자기 레이어를 다시 만들어야 하므로 onGridChange() 로 알려준다. */
@@ -1376,6 +1527,7 @@ function buildUI(meta){
   });
 
   wireControls(meta);
+  wireLive();
 
   const tex = meta.texture;
   el("methodNote").innerHTML = `
@@ -1481,6 +1633,69 @@ const PAGE = {
     select(meta.scenarios.some(x => x.key === want) ? want : meta.scenarios[0].key);
   },
 };
+
+
+/* ---- 실시간 수위 보기 ---- */
+async function wireLive(){
+  const btn = el("liveOn"), box = el("liveCtl"), info = el("liveInfo");
+  if(!btn) return;
+  if(!SCHAN){
+    btn.disabled = true; btn.style.opacity = .45;
+    info.textContent = "이 구간에는 종단거리 격자(schan.png)가 없습니다.";
+    return;
+  }
+  btn.addEventListener("click", async ()=>{
+    if(current === "live"){ select(META.scenarios[0].key); return; }   // 끄기
+    try{
+      if(!LIVE.ready){ info.textContent = "수위 자료 받는 중…"; await loadLive(); }
+    }catch(e){ info.textContent = "수위 자료를 쓰지 못합니다: " + e.message; return; }
+    const sl = el("liveSlider");
+    sl.max = String(LIVE.hours.length - 1);
+    sl.value = String(LIVE.idx);
+    box.hidden = false;
+    showLive(LIVE.idx);
+  });
+  // ?live=1 로 바로 켤 수 있다(화면 공유·점검용). ?lh=12 처럼 시각 색인도 줄 수 있다.
+  const q = new URLSearchParams(location.search);
+  if(q.has("live")){
+    try{
+      await loadLive();
+      const h = parseInt(q.get("lh"), 10);
+      el("liveSlider").max = String(LIVE.hours.length - 1);
+      box.hidden = false;
+      showLive(Number.isFinite(h) ? Math.max(0, Math.min(LIVE.hours.length - 1, h)) : LIVE.idx);
+    }catch(e){ info.textContent = "수위 자료를 쓰지 못합니다: " + e.message; }
+  }
+
+  el("liveSlider") && el("liveSlider").addEventListener("input", e => showLive(+e.target.value));
+  el("livePrev") && el("livePrev").addEventListener("click", ()=> showLive(Math.max(0, LIVE.idx - 1)));
+  el("liveNext") && el("liveNext").addEventListener("click",
+    ()=> showLive(Math.min(LIVE.hours.length - 1, LIVE.idx + 1)));
+}
+
+function showLive(k){
+  LIVE.idx = k;
+  const sl = el("liveSlider"); if(sl) sl.value = String(k);
+  const r = computeLiveDepth(k);
+  const info = el("liveInfo");
+  if(!r){ info.textContent = `${LIVE.hours[k]} — 이 시각에는 쓸 수 있는 관측값이 없습니다.`; return; }
+
+  DEPTHS.live = LIVE.depth;
+  current = "live";
+  document.querySelectorAll("#scenList button").forEach(b => b.setAttribute("aria-pressed", "false"));
+  el("liveOn").setAttribute("aria-pressed", "true");
+  buildWater("live");
+  if(typeof invalidateBuildings === "function") invalidateBuildings();
+
+  const used = LIVE.gauges.filter(g => g.live.series[k] !== null && g.live.series[k] !== undefined);
+  el("liveArea").textContent = r.areaKm2.toFixed(1) + " km²";
+  el("stArea").textContent = r.areaKm2.toFixed(1);
+  el("stOff").textContent = "–";
+  el("stDepth").textContent = "–";
+  el("stMax").textContent = r.maxd.toFixed(2);
+  info.textContent = `${LIVE.hours[k]} 기준 · 관측소 ${used.length}곳 · 침수 ${r.areaKm2.toFixed(1)} km²`
+    + ` · 최대수심 ${r.maxd.toFixed(1)} m`;
+}
 
 boot();
 })();
