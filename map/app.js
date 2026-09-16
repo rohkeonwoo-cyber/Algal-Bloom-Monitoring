@@ -35,23 +35,54 @@ function vworldStyle(layer) {
   };
 }
 
-const map = new maplibregl.Map({
-  container: "map",
-  style: vworldStyle("Base"),
-  center: [127.8, 36.3],
-  zoom: 6.4,
-  attributionControl: { compact: true },
-});
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), "bottom-left");
+/* 지도는 WebGL 이 있어야 뜬다. 원격 데스크톱·구형 GPU·정책으로 막힌 환경에서는 생성이
+ * 실패하는데, 그때 스크립트가 여기서 멈추면 **목록까지 안 나오고 화면이 빈다.**
+ * 지도 없이도 목록·필터·상세는 쓸 수 있어야 하므로 실패를 감싸서 진행한다. */
+let map = null;
 
-document.querySelectorAll(".bm").forEach((b) => {
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".bm").forEach((x) => x.classList.toggle("on", x === b));
-    // 스타일을 갈아끼우면 마커(DOM 요소)는 그대로 남는다 — 다시 그릴 필요 없다.
-    map.setStyle(vworldStyle(b.dataset.style));
+function mapFailed(msg) {
+  const el = document.getElementById("map");
+  el.innerHTML = `<div class="mapfail">
+      <b>지도를 표시할 수 없습니다.</b>
+      <span>${msg}</span>
+      <span>왼쪽 목록과 지점별 상세는 그대로 쓰실 수 있습니다.</span>
+    </div>`;
+  document.querySelector(".basemap").hidden = true;
+}
+
+try {
+  map = new maplibregl.Map({
+    container: "map",
+    style: vworldStyle("Base"),
+    center: [127.8, 36.3],
+    zoom: 6.4,
+    attributionControl: { compact: true },
   });
-});
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), "bottom-left");
+
+  // 타일이 안 오는 경우(망 차단, 인증키 한도)에도 원인을 화면에 알린다.
+  let tileWarned = false;
+  map.on("error", (e) => {
+    const m = String(e && e.error && e.error.message || "");
+    if (!tileWarned && /tile|fetch|network|Failed/i.test(m)) {
+      tileWarned = true;
+      document.getElementById("tilewarn").hidden = false;
+    }
+  });
+
+  document.querySelectorAll(".bm").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".bm").forEach((x) => x.classList.toggle("on", x === b));
+      // 스타일을 갈아끼우면 마커(DOM 요소)는 그대로 남는다 — 다시 그릴 필요 없다.
+      map.setStyle(vworldStyle(b.dataset.style));
+    });
+  });
+} catch (err) {
+  mapFailed(navigator.userAgent && !window.WebGL2RenderingContext
+    ? "이 브라우저가 WebGL 을 지원하지 않습니다."
+    : "브라우저에서 WebGL 을 쓸 수 없습니다(원격 데스크톱·그래픽 드라이버·보안 정책 등).");
+}
 
 /* ---- 데이터 ---- */
 function fmtDate(s) { return (s || "").replace(/\./g, ".").replace(/\.$/, ""); }
@@ -79,6 +110,7 @@ async function load() {
 
 /* 첫 화면을 지점 분포에 맞춘다. 고정 zoom 으로 두면 북한·일본이 화면의 절반을 차지한다. */
 function fitToData() {
+  if (!map) return;
   const b = new maplibregl.LngLatBounds();
   state.rows.forEach((r) => b.extend([r.lon, r.lat]));
   map.fitBounds(b, { padding: { top: 60, bottom: 40, left: 40, right: 40 }, duration: 0 });
@@ -117,10 +149,14 @@ function buildMarkers() {
     el.style.background = COLOR[r.level || ""];
     el.title = `${r.water} ${r.station}`;
     el.addEventListener("click", (e) => { e.stopPropagation(); select(r.code, true); });
-    const mk = new maplibregl.Marker({ element: el }).setLngLat([r.lon, r.lat]).addTo(map);
-    state.markers.set(r.code, { marker: mk, el });
+    if (map) {
+      const mk = new maplibregl.Marker({ element: el }).setLngLat([r.lon, r.lat]).addTo(map);
+      state.markers.set(r.code, { marker: mk, el });
+    } else {
+      state.markers.set(r.code, { marker: null, el });   // 지도 없이도 목록 필터는 동작한다
+    }
   });
-  map.on("click", () => select(null));
+  if (map) map.on("click", () => select(null));
 }
 
 /* ---- 목록 ---- */
@@ -165,7 +201,7 @@ function select(code, fly) {
   const r = state.rows.find((x) => x.code === state.sel);
   const box = $("#detail");
   if (!r) { box.hidden = true; return; }
-  if (fly) map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 10), speed: 1.1 });
+  if (fly && map) map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 10), speed: 1.1 });
 
   const basis = r.level_basis_n >= 2
     ? `최근 2회 채수로 판정했습니다.`
