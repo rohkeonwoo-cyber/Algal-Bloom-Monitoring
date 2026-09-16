@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>전국 조류경보 지점 지도 — 낙동강 녹조 모니터</title>
-<meta name="description" content="국립환경과학원 조류경보제 68개 지점의 최근 유해남조류 세포수와 판정 단계를 지도에서 봅니다.">
+<title>전국 녹조 관측 지점 지도 — 낙동강 녹조 모니터</title>
+<meta name="description" content="조류경보제 68개 지점의 유해남조류 세포수와 수질자동측정망 77개 지점의 시간별 Chl-a 를 한 지도에서 봅니다.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -12,16 +12,22 @@
 <div id="app">
   <aside id="side">
     <header class="sh">
-      <h1>전국 조류경보 지점</h1>
+      <h1>전국 녹조 관측 지점</h1>
       <p class="sub" id="updated">불러오는 중…</p>
-      <p class="note">단계는 <b>유해남조류 세포수 2회 연속 초과</b> 기준으로 매긴 값입니다.
-        공식 발령 상태는 유역환경청 발표가 기준입니다.</p>
+      <p class="sub" id="autoInfo"></p>
+      <p class="note">조류경보 단계는 <b>유해남조류 세포수 2회 연속 초과</b> 기준으로 매긴 값입니다.
+        공식 발령 상태는 유역환경청 발표가 기준입니다.
+        자동측정망 Chl-a 는 센서값이라 채수·계수로 정하는 경보 단계와 직접 비교할 수 없습니다.</p>
     </header>
 
     <div class="tally" id="tally"></div>
 
     <div class="filters">
       <input type="search" id="q" placeholder="수역·지점·주소 검색" autocomplete="off">
+      <div class="chips" id="layerChips">
+        <button class="chip on" data-layer="algae">조류경보제</button>
+        <button class="chip on" data-layer="auto">자동측정망</button>
+      </div>
       <div class="chips" id="kindChips">
         <button class="chip on" data-kind="all">전체</button>
         <button class="chip" data-kind="하천">하천</button>

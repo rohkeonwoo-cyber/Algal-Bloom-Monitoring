@@ -47,12 +47,15 @@ cd "$REPO_DIR"
 # rebase: You have unstaged changes" 로 매번 pull 이 건너뛰어진다.
 git pull --rebase --autostash --quiet || echo "경고: git pull 실패(계속 진행)"
 
-ok_hrfco=1; ok_algae=1
+ok_hrfco=1; ok_algae=1; ok_auto=1
 "$PYTHON" scripts/fetch_hrfco.py || { ok_hrfco=0; echo "경고: HRFCO 수집 실패"; }
 "$PYTHON" scripts/fetch_algae.py || { ok_algae=0; echo "경고: 조류경보 수집 실패"; }
+# 자동측정망은 비공식 경로라 언젠가 끊길 수 있다. 실패해도 직전 결과를 그대로 두고
+# 나머지 수집은 계속한다(스크립트가 data/auto_latest.json 을 덮어쓰지 않고 종료한다).
+"$PYTHON" scripts/fetch_auto.py || { ok_auto=0; echo "경고: 자동측정망 수집 실패"; }
 
-if [ "$ok_hrfco" = "0" ] && [ "$ok_algae" = "0" ]; then
-  echo "두 수집 모두 실패 — 커밋하지 않고 종료" >&2
+if [ "$ok_hrfco" = "0" ] && [ "$ok_algae" = "0" ] && [ "$ok_auto" = "0" ]; then
+  echo "수집이 모두 실패 — 커밋하지 않고 종료" >&2
   exit 1
 fi
 
