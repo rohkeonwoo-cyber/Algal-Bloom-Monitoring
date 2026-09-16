@@ -514,8 +514,10 @@ function buildScene(meta, texImg){
   });
   scene.add(new THREE.Mesh(skyGeo, skyMat));
 
-  camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 50, spanX * 6);
-  renderer = new THREE.WebGLRenderer({antialias:true});
+  // 근접면 2 m — 건물 옆까지 내려가도 앞이 잘리지 않게. 원거리(수십 km)와 함께 쓰려면
+  // 깊이 정밀도가 부족해 z-파이팅이 생기므로 로그 깊이버퍼를 켠다.
+  camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 2, spanX * 6);
+  renderer = new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   el("stage").appendChild(renderer.domElement);
@@ -701,7 +703,7 @@ function loadTile(z, x, y){
 
 function viewRegion(){
   // 보고 있는 지점(orbit.target)을 중심으로, 확대 정도에 비례한 정사각 범위를 잡는다.
-  const half = Math.max(400, Math.min(orbit.dist * 0.5, 26000));
+  const half = Math.max(120, Math.min(orbit.dist * 0.5, 26000));
   // 정점 c 는 world x = -SPANX/2 + c·RES, 5186 x = X5186_0 + c·RES 이므로
   // 5186 x = X5186_0 + (world x + SPANX/2). z 축은 남쪽이 +이므로 부호가 반대.
   const cx = X5186_0 + orbit.target.x + SPANX/2;
@@ -780,7 +782,13 @@ async function refreshDetail(){
   terrainMat.uniforms.uHasDetail.value = 1;
   if(prev) prev.dispose();
   VW.lastSig = sig; VW.busy = false;
-  st.textContent = `브이월드 줌 ${z} · ${mpp.toFixed(2)} m/화소 · 타일 ${nx*ny}장`
+  // 화면 1화소가 몇 m 인지와 영상 원본 해상도를 같이 보여준다. 원본보다 더 확대하면
+  // 아무리 당겨도 선명해지지 않는다 — 코드 한계가 아니라 자료 한계임을 알리는 것이다.
+  const screenMpp = (2 * half) / Math.max(innerWidth, 800);
+  const over = screenMpp < mpp * 0.9
+    ? ` · 화면 ${screenMpp.toFixed(2)} m/화소 — 원본보다 확대해 흐려집니다`
+    : "";
+  st.textContent = `브이월드 줌 ${z} · ${mpp.toFixed(2)} m/화소 · 타일 ${nx*ny}장${over}`
     + ` (캐시 ${VW.cache.size})`;
 }
 
@@ -889,6 +897,7 @@ function buildWater(key){
 
 // ---------- 카메라 조작 (three.js 예제 OrbitControls 는 cdnjs 에 없어 직접 구현) ----------
 let orbit = {theta:-0.55, phi:0.42, dist:0, target:new THREE.Vector3()};
+const MIN_DIST = 60;     // m. 더 가까이 가면 30 m 격자가 판때기로 보인다
 function frameCamera(spanX, spanZ){
   orbit.dist = Math.max(spanX, spanZ) * 0.78;
   orbit.target.set(0, 0, 0);
@@ -949,7 +958,8 @@ function setupControls(spanX){
     // 화면 중앙이 아니라 커서가 가리키는 지점 쪽으로 들어가야 원하는 곳에 닿는다
     const g = zoomIn ? pickPoint(e.clientX, e.clientY) : null;
     orbit.dist *= zoomIn ? 1/1.12 : 1.12;
-    orbit.dist = Math.max(spanX * 0.04, Math.min(spanX * 3, orbit.dist));
+    // 아래로는 60 m 까지 내려간다(건물 사이까지). 위로는 구간 폭의 3배.
+    orbit.dist = Math.max(MIN_DIST, Math.min(spanX * 3, orbit.dist));
     if(g){
       const wx = -SPANX/2 + g.c*RES, wz = -SPANZ/2 + g.r*RES;
       const k = 0.22;                      // 한 번에 다 끌어당기면 멀미가 난다
@@ -966,7 +976,7 @@ function setupControls(spanX){
     orbit.target.set(-SPANX/2 + g.c*RES,
                      elevAt(g.r*GW + g.c) * vex,
                      -SPANZ/2 + g.r*RES);
-    orbit.dist = Math.max(spanX * 0.04, orbit.dist * 0.45);
+    orbit.dist = Math.max(MIN_DIST, orbit.dist * 0.45);
     applyCamera();
   });
 }
