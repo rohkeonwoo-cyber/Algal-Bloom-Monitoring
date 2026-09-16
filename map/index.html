@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전국 조류경보 지점 지도 — 낙동강 녹조 모니터</title>
+<meta name="description" content="국립환경과학원 조류경보제 68개 지점의 최근 유해남조류 세포수와 판정 단계를 지도에서 봅니다.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <header class="sh">
+      <h1>전국 조류경보 지점</h1>
+      <p class="sub" id="updated">불러오는 중…</p>
+      <p class="note">단계는 <b>유해남조류 세포수 2회 연속 초과</b> 기준으로 매긴 값입니다.
+        공식 발령 상태는 유역환경청 발표가 기준입니다.</p>
+    </header>
+
+    <div class="tally" id="tally"></div>
+
+    <div class="filters">
+      <input type="search" id="q" placeholder="수역·지점·주소 검색" autocomplete="off">
+      <div class="chips" id="kindChips">
+        <button class="chip on" data-kind="all">전체</button>
+        <button class="chip" data-kind="하천">하천</button>
+        <button class="chip" data-kind="호소">호소</button>
+      </div>
+    </div>
+
+    <ul id="list" class="list"></ul>
+
+    <footer class="sf">
+      <a href="../index.html">낙동강 대시보드</a>
+      <a href="../flood/">3D 침수·녹조 뷰어</a>
+    </footer>
+  </aside>
+
+  <main id="mapwrap">
+    <div id="map"></div>
+    <div class="mapui">
+      <div class="basemap">
+        <button class="bm on" data-style="Base">지도</button>
+        <button class="bm" data-style="Satellite">위성</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div id="detail" class="detail" hidden></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.0/maplibre-gl.js"></script>
+<script src="../flood/vworld-key.js"></script>
+<script src="app.js" defer></script>
+</body>
+</html>

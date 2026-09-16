@@ -1,0 +1,96 @@
+/* 전국 조류경보 지점 지도 — 대시보드(index.html)와 같은 단계 색을 쓴다.
+   색 램프는 OKLCH 에서 인접 단계 dE >= 15 를 확인한 값이다(09_manuscript/dashboard/build/색상검증.py). */
+:root{
+  --ink:#1b211f; --ink2:#48524e; --ink3:#78837e;
+  --bg:#f4f6f5; --panel:#ffffff; --line:#dde3e0;
+  --lv-정상:#7e8984; --lv-관심:#ffd95a; --lv-경계:#b8381a; --lv-대발생:#6e040b; --lv-없음:#c3cac7;
+  --focus:#1f6f5c;
+  font-synthesis-weight:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font:14px/1.5 "Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  color:var(--ink); background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+#app{display:grid; grid-template-columns:340px 1fr; height:100vh}
+
+/* ---- 왼쪽 패널 ---- */
+#side{display:flex; flex-direction:column; background:var(--panel); border-right:1px solid var(--line); min-height:0}
+.sh{padding:16px 16px 10px}
+.sh h1{margin:0 0 4px; font-size:17px; letter-spacing:-.01em}
+.sub{margin:0; color:var(--ink2); font-size:12.5px}
+.note{margin:8px 0 0; padding:8px 10px; background:#f0f4f2; border-radius:8px;
+      color:var(--ink2); font-size:11.5px; line-height:1.45}
+.note b{color:var(--ink)}
+
+.tally{display:flex; gap:6px; padding:0 16px 12px; flex-wrap:wrap}
+.tw{flex:1 1 auto; min-width:64px; padding:7px 9px; border:1px solid var(--line); border-radius:9px;
+    background:#fff; cursor:pointer; text-align:left}
+.tw[aria-pressed="true"]{border-color:var(--focus); box-shadow:inset 0 0 0 1px var(--focus)}
+.tw .n{display:block; font-size:17px; font-weight:650; font-variant-numeric:tabular-nums}
+.tw .l{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink2)}
+.dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto}
+
+.filters{padding:0 16px 10px; display:flex; flex-direction:column; gap:8px}
+#q{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff}
+#q:focus{outline:2px solid var(--focus); outline-offset:1px}
+.chips{display:flex; gap:6px}
+.chip{padding:5px 11px; border:1px solid var(--line); border-radius:999px; background:#fff;
+      font:inherit; font-size:12.5px; color:var(--ink2); cursor:pointer}
+.chip.on{background:var(--ink); border-color:var(--ink); color:#fff}
+
+.list{flex:1 1 auto; overflow:auto; margin:0; padding:0 8px 8px; list-style:none; min-height:0}
+.row{display:grid; grid-template-columns:10px 1fr auto; gap:9px; align-items:center;
+     width:100%; padding:9px 8px; border:0; border-radius:9px; background:transparent;
+     font:inherit; text-align:left; cursor:pointer}
+.row:hover{background:#f1f5f3}
+.row[aria-current="true"]{background:#e6efec; box-shadow:inset 0 0 0 1px var(--focus)}
+.row .bar{width:10px; height:26px; border-radius:3px}
+.row .nm{font-size:13px; line-height:1.3}
+.row .nm small{display:block; color:var(--ink3); font-size:11px}
+.row .v{font-size:12.5px; font-variant-numeric:tabular-nums; color:var(--ink2); text-align:right}
+.row .v b{display:block; color:var(--ink); font-size:13px}
+.empty{padding:22px 12px; color:var(--ink3); font-size:13px; text-align:center}
+
+.sf{display:flex; gap:12px; padding:10px 16px; border-top:1px solid var(--line); font-size:12.5px}
+.sf a{color:var(--focus); text-decoration:none}
+.sf a:hover{text-decoration:underline}
+
+/* ---- 지도 ---- */
+#mapwrap{position:relative; min-width:0}
+#map{position:absolute; inset:0}
+.mapui{position:absolute; left:12px; top:12px; display:flex; flex-direction:column; gap:8px; z-index:2}
+.basemap{display:flex; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden}
+.bm{padding:6px 12px; border:0; background:#fff; font:inherit; font-size:12.5px; color:var(--ink2); cursor:pointer}
+.bm.on{background:var(--ink); color:#fff}
+.legend{background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 11px; font-size:11.5px}
+.legend div{display:flex; align-items:center; gap:6px; margin:3px 0; color:var(--ink2)}
+
+/* 지점 마커 — 단계별 색, 분석중이면 점선 테두리 */
+.mk{width:15px; height:15px; border-radius:50%; border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer}
+.mk.sel{transform:scale(1.55); z-index:3}
+.mk.pending{border-style:dashed}
+
+.detail{position:absolute; right:12px; top:12px; width:272px; z-index:3;
+        background:#fff; border:1px solid var(--line); border-radius:11px;
+        padding:13px 14px; box-shadow:0 6px 22px rgba(0,0,0,.13)}
+.detail h2{margin:0 0 2px; font-size:15px}
+.detail .addr{margin:0 0 9px; color:var(--ink3); font-size:11.5px}
+.detail dl{display:grid; grid-template-columns:auto 1fr; gap:5px 10px; margin:0 0 9px; font-size:12.5px}
+.detail dt{color:var(--ink3)}
+.detail dd{margin:0; font-variant-numeric:tabular-nums; text-align:right}
+.detail .lv{display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:999px;
+            font-size:12px; font-weight:600; color:#fff}
+.detail .basis{margin:0; padding-top:8px; border-top:1px solid var(--line);
+               color:var(--ink2); font-size:11.5px; line-height:1.45}
+.detail .close{position:absolute; right:8px; top:8px; border:0; background:transparent;
+               font-size:17px; color:var(--ink3); cursor:pointer; line-height:1; padding:4px}
+
+@media (max-width:860px){
+  #app{grid-template-columns:1fr; grid-template-rows:auto 1fr}
+  #side{max-height:46vh; border-right:0; border-bottom:1px solid var(--line)}
+  .detail{right:8px; left:8px; width:auto}
+}
