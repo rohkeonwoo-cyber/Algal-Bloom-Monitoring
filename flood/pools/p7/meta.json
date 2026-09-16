@@ -1,0 +1,204 @@
+{
+ "pool": 7,
+ "grid": {
+  "w": 659,
+  "h": 666,
+  "down": 1
+ },
+ "res_m": 30.0,
+ "elev_offset_m": 30.0,
+ "encoding": "rgb16",
+ "elev_scale": 0.1,
+ "depth_scale": 0.01,
+ "dist_file": "dist.png",
+ "dist_scale": 1.0,
+ "bounds_5186": [
+  304724.653251495,
+  412872.0461243596,
+  324494.653251495,
+  432852.0461243596
+ ],
+ "bounds_4326": [
+  128.16602420237157,
+  36.3081811923207,
+  128.38929398816552,
+  36.485833511246945
+ ],
+ "extent_m": [
+  19770.0,
+  19980.0
+ ],
+ "elev_range_m": [
+  30.0,
+  784.3
+ ],
+ "s_range_km": [
+  237.1,
+  252.7
+ ],
+ "reach": {
+  "s_lo": 237.1,
+  "s_hi": 252.7
+ },
+ "channel": {
+  "dem_median_el_m": 7.75,
+  "dem_sd_m": 1.26,
+  "dem_is_water_surface": true,
+  "current_wse_median_el_m": 11.26,
+  "pool_mean_depth_m": 6.4,
+  "note": "하도 화소의 DEM 은 하상이 아니라 레이더 촬영 당시 수면이다(레이더는 물을 투과하지 못함). 하도 안의 수심 값은 '그 수면 대비'이며 실제 하상까지의 깊이가 아니다. 담수역 평균수심은 06_기초통계 §7."
+ },
+ "gauges": [
+  {
+   "name": "의성군(낙단교)",
+   "s": 236.5,
+   "pool": 6,
+   "dist_km": 0.08,
+   "gdt": 27.145,
+   "x": 316784.2,
+   "y": 418499.8,
+   "now": 32.585,
+   "att": 35.445,
+   "wrn": 36.145,
+   "alm": 37.645,
+   "srs": 40.515
+  },
+  {
+   "name": "의성군(낙단보상)",
+   "s": 237.3,
+   "pool": 7,
+   "dist_km": 0.6,
+   "gdt": 0.0,
+   "x": 317856.8,
+   "y": 418483.5,
+   "now": 39.76,
+   "att": 40.5,
+   "wrn": 42.4,
+   "alm": 43.0,
+   "srs": 44.15
+  },
+  {
+   "name": "상주시(강창교)",
+   "s": 248.9,
+   "pool": 7,
+   "dist_km": 0.1,
+   "gdt": 35.051,
+   "x": 311623.1,
+   "y": 424228.2,
+   "now": 39.751,
+   "att": 40.501,
+   "wrn": 44.351,
+   "alm": 46.051,
+   "srs": 47.451
+  },
+  {
+   "name": "상주시(병성교)",
+   "s": 251.5,
+   "pool": 7,
+   "dist_km": 1.49,
+   "gdt": 39.309,
+   "x": 309518.6,
+   "y": 427068.6,
+   "now": 40.719,
+   "att": 43.309,
+   "wrn": 44.809,
+   "alm": 46.409,
+   "srs": 47.989
+  },
+  {
+   "name": "상주시(상주보하)",
+   "s": 252.1,
+   "pool": 7,
+   "dist_km": 0.18,
+   "gdt": 0.0,
+   "x": 311412.9,
+   "y": 427000.3,
+   "now": 39.73,
+   "att": 43.1,
+   "wrn": 45.0,
+   "alm": 47.0,
+   "srs": 48.51
+  },
+  {
+   "name": "상주시(상주보상)",
+   "s": 252.9,
+   "pool": 8,
+   "dist_km": 0.22,
+   "gdt": 0.0,
+   "x": 312214.0,
+   "y": 426702.3,
+   "now": 47.08,
+   "att": 47.5,
+   "wrn": 48.9,
+   "alm": 50.0,
+   "srs": 51.26
+  }
+ ],
+ "texture": {
+  "file": "texture.jpg",
+  "size": [
+   1977,
+   1998
+  ],
+  "scenes": [
+   {
+    "id": "S2C_MSIL2A_20250322T021601_R003_T52SDF_20250322T062116",
+    "date": "2025-03-22",
+    "cloud": 0.0
+   }
+  ],
+  "coverage_pct": 100.0
+ },
+ "scenarios": [
+  {
+   "key": "now",
+   "label": "현재 수위",
+   "file": "depth_now.png",
+   "max_depth_m": 2.6,
+   "area_km2": 10.64,
+   "offchannel_km2": 1.59,
+   "depth_mean_m": 1.04,
+   "depth_p95_m": 2.6
+  },
+  {
+   "key": "att",
+   "label": "관심수위",
+   "file": "depth_att.png",
+   "max_depth_m": 4.68,
+   "area_km2": 13.57,
+   "offchannel_km2": 2.82,
+   "depth_mean_m": 1.9,
+   "depth_p95_m": 4.34
+  },
+  {
+   "key": "wrn",
+   "label": "주의수위",
+   "file": "depth_wrn.png",
+   "max_depth_m": 7.45,
+   "area_km2": 17.83,
+   "offchannel_km2": 6.95,
+   "depth_mean_m": 3.25,
+   "depth_p95_m": 5.67
+  },
+  {
+   "key": "alm",
+   "label": "경계수위",
+   "file": "depth_alm.png",
+   "max_depth_m": 9.18,
+   "area_km2": 21.86,
+   "offchannel_km2": 10.93,
+   "depth_mean_m": 3.78,
+   "depth_p95_m": 6.89
+  },
+  {
+   "key": "srs",
+   "label": "심각수위",
+   "file": "depth_srs.png",
+   "max_depth_m": 10.74,
+   "area_km2": 32.57,
+   "offchannel_km2": 21.6,
+   "depth_mean_m": 3.97,
+   "depth_p95_m": 8.4
+  }
+ ]
+}
