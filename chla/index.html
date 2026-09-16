@@ -418,10 +418,7 @@ async function boot(){
     const st = el("vwStat"); if(st) st.textContent = "항공영상을 받지 못했습니다: " + e.message;
     VW.busy = false;
   }); }
-  if(q.has("bld") && typeof BLD === "object" && VW.key){
-    BLD.on = true;
-    const btn = el("bldOn");
-    if(btn) btn.setAttribute("aria-pressed", "true");
+  if(typeof BLD === "object" && BLD.on && VW.key){
     refreshBuildings().catch(e=>{
       const st = el("bldStat");
       if(st) st.textContent = "건물 처리 중 오류: " + e.message;
@@ -1015,7 +1012,10 @@ function animate(){
    범위가 넓으면 건물이 수십만 동이라 한 번에 못 받는다. 화면이 충분히 확대됐을 때만,
    보이는 범위를 1 km 타일로 끊어 받고 타일 단위로 캐시한다(브이월드 상세영상과 같은 방식). */
 const BLD = {
-  on: false, group: null, cache: new Map(), busy: false, lastSig: "",
+  // 기본으로 켠다. 화면 폭이 6 km 아래로 좁아졌을 때만 요청하므로 넓게 볼 때는 호출이 없다.
+  // (항공영상도 기본 꺼짐이라 "화질이 낮다"는 인상을 줬다 — 켜야 보이는 기능은 없는 기능과 같다.)
+  // ?bld=0 으로 끌 수 있다.
+  on: new URLSearchParams(location.search).get("bld") !== "0", group: null, cache: new Map(), busy: false, lastSig: "",
   tile: 1000,          // m. 요청 단위
   maxTiles: 12,        // 한 번에 받을 타일 수 상한
   maxSize: 1000,       // 한 요청당 건물 수 상한(API 제한)
@@ -1224,7 +1224,10 @@ function wireBuildings(){
     st.textContent = "브이월드 인증키가 없어 건물을 받을 수 없습니다.";
     return;
   }
-  st.textContent = "꺼져 있음 — 켜고 확대하면 건물이 섭니다.";
+  btn.setAttribute("aria-pressed", String(BLD.on));
+  btn.style.background = BLD.on ? "var(--accent-soft)" : "var(--surface-2)";
+  btn.style.borderColor = BLD.on ? "var(--accent)" : "var(--border)";
+  st.textContent = BLD.on ? "켜짐 — 확대하면 건물이 섭니다." : "꺼져 있음 — 켜면 확대할 때 건물이 섭니다.";
   btn.addEventListener("click", ()=>{
     BLD.on = !BLD.on;
     btn.setAttribute("aria-pressed", String(BLD.on));
