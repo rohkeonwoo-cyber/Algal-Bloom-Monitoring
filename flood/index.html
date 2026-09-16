@@ -138,8 +138,8 @@
   <h2>녹조 (Chl-a 초과빈도)</h2>
   <div class="scen" id="chlaMode">
     <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span></button>
-    <button data-m="all"><i style="background:#b73b8b"></i><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
-    <button data-m="jja"><i style="background:#981e70"></i><span class="nm">여름(JJA)</span><span class="km2 mono" id="chlaJjaR">–</span></button>
+    <button data-m="all"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
+    <button data-m="jja"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">여름(JJA)</span><span class="km2 mono" id="chlaJjaR">–</span></button>
   </div>
   <div class="swatches" id="chlaSwatches" style="background:#20333a"></div>
   <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
@@ -677,11 +677,20 @@ function scheduleDetail(){
 }
 
 /* ---- 녹조(Chl-a) 리본 ----
-   순차형이므로 단일 색상(자홍) 명도 순차. 지도 위에 함께 나오는 물(파랑)·지형(초록·갈색·
-   회색)과의 최소 색차 dE 14.2 를 확인하고 고른 값이다(연한 분홍은 도로·나대지의 밝은
-   회색과 dE 7 로 붙어 못 쓴다). 데이터 값을 나타내는 면이므로 조명을 받지 않게 한다 —
-   음영이 끼면 같은 값이 자리에 따라 달라 보인다. */
-const CHLA_RAMP = ["#ffa1d7","#eb7dbe","#d35ba5","#b73b8b","#981e70","#770355"];
+   낮은 값 파랑 → 높은 값 빨강. 수질·녹조 지도에서 널리 쓰는 방향이라 범례를 보지 않아도
+   읽힌다. 다만 저농도(파랑)가 물빛과 겹칠 위험이 있어 색차를 재고 골랐다(OKLab dE).
+
+     인접 단계 최소 dE 16.3   (이전 자홍 램프는 8.8 — 중간 단계가 서로 붙어 있었다)
+     장면 요소와 최소 dE 12.3 (청록 단계 vs 회색 지형. 리본은 물 위에 놓이므로
+                              실제로 겹치는 배경인 물과는 전 단계가 dE 20 이상)
+     저농도색 #2f6fe0 vs 물: 얕은 물 dE 32.6, 깊은 물 dE 25.2 — 물과 헷갈리지 않는다
+
+   데이터 값을 나타내는 면이므로 조명을 받지 않게 한다 — 음영이 끼면 같은 값이 자리에
+   따라 달라 보인다.
+
+   한계: 무지개형 램프는 값 차이를 실제보다 크거나 작게 보이게 하는 구간이 생긴다
+   (청록→초록 경계에서 특히). 정확한 값 비교는 리본 색이 아니라 지점 클릭으로 읽는다. */
+const CHLA_RAMP = ["#2f6fe0","#0e9aa8","#57c06b","#e8c93c","#ef7c1f","#c62317"];
 const RIBBON_HALF_W = 175;   // m. 하폭 중위 310 m 와 비슷한 폭으로 둔다
 const RIBBON_LIFT = 6;       // m. 수면 위로 살짝 띄워 물에 가리지 않게
 
