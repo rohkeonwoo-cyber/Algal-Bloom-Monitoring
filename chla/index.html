@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>낙동강 침수 시나리오 3D</title>
+<title>낙동강 녹조 분포 3D</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -135,40 +135,37 @@
 <div id="stage"></div>
 
 <div class="hud topbar">
-  <h1 class="display">낙동강 침수 시나리오</h1>
-  <span class="sub" id="reachLabel">창녕함안보~합천창녕보</span>
-  <a href="../chla/">녹조 3D →</a>
+  <h1 class="display">낙동강 녹조 분포</h1>
+  <span class="sub" id="reachLabel">낙동강 본류</span>
+  <a href="../flood/">침수 3D →</a>
   <a href="../">← 조류 모니터로</a>
 </div>
 
 <div class="hud panel left">
-  <h2>수위 시나리오</h2>
-  <div class="scen" id="scenList"></div>
-
-  <h2>지점으로 가기</h2>
-  <select id="goto" style="width:100%; background:var(--surface-2); color:var(--ink-1);
-          border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px;">
-    <option value="">— 관측소 선택 —</option>
-  </select>
-  <div class="ro-none" style="margin-top:6px">전체 보기로 돌아가려면 목록 맨 위를 다시 고르세요.</div>
-
-  <h2>침수 규모</h2>
-  <div class="stats">
-    <div class="stat"><b class="mono" id="stArea">–</b><span>침수면적 km²</span></div>
-    <div class="stat"><b class="mono" id="stOff">–</b><span>하도 외 km²</span></div>
-    <div class="stat"><b class="mono" id="stDepth">–</b><span>평균수심 m</span></div>
-    <div class="stat"><b class="mono" id="stMax">–</b><span>최대수심 m</span></div>
+  <h2>표현</h2>
+  <div class="scen" id="chlaMode">
+    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
+    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
+    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
   </div>
 
-  <h2>보는 범위</h2>
-  <div class="pools" id="poolPick"></div>
-  <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).
-    확대했을 때 물가 선이 훨씬 또렷합니다.</div>
+  <h2>기간</h2>
+  <div class="scen" id="chlaPeriod">
+    <button data-p="all"><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
+    <button data-p="jja"><span class="nm">여름(JJA)</span><span class="km2 mono" id="chlaJjaR">–</span></button>
+  </div>
+  <div class="swatches" id="chlaSwatches" style="background:#20333a"></div>
+  <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
+  <div class="swnote">Sentinel-2 추정 Chl-a 가 <b>25 mg/m³</b> 를 넘은 관측일 비율.
+    2019–2025, 200 m 구간 1,340개. 논문·대시보드와 같은 값입니다.</div>
 
-  <h2>수심</h2>
-  <div class="swatches" id="depthSwatches"></div>
-  <div class="swlabels"><span>0 m</span><span id="swMid">–</span><span id="swMax">–</span></div>
-  <div class="swnote">얕은 곳은 잠긴 지형이 비쳐 보이고, 깊어질수록 물빛에 가려집니다.</div>
+  <h2>고농도 구간</h2>
+  <div class="hotlist" id="hotList"></div>
+  <div class="swnote">누르면 그 구간으로 이동합니다.</div>
+
+  <h2>조류경보 지점</h2>
+  <div class="hotlist" id="stationList"></div>
+  <div class="swnote" id="algaeNote">–</div>
 
   <h2>보기</h2>
   <div class="ctl">
@@ -212,28 +209,27 @@
   </div>
 
 
-  <h2>검증과 한계</h2>
-  <div class="note" id="valNote">–</div>
-  <details>
-    <summary>어떻게 계산했나</summary>
-    <div class="note" id="methodNote"></div>
-  </details>
+  <h2>보는 범위</h2>
+  <div class="pools" id="poolPick"></div>
+  <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).</div>
 </div>
 
 <div class="hud panel readout" id="readout">
+  <h2>종단 분포</h2>
+  <div class="profile" id="profile"></div>
+  <div class="swnote" id="profNote">하구(0 km) → 상류(268 km). 누르면 그 위치로 이동합니다.</div>
   <h2>가리킨 지점</h2>
-  <div id="roBody"><div class="ro-none">지형 위에 마우스를 올리면 그 지점의 수심과 표고를 읽습니다.</div></div>
+  <div id="roBody"><div class="ro-none">강 위에 마우스를 올리면 그 구간의 초과빈도를 읽습니다.</div></div>
 </div>
 
-<div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 <b>확대</b>(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
+<div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 확대(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
 
-<div class="loading" id="loading">
-  <p id="loadMsg">지형·침수 자료를 불러오는 중…</p>
-  <div class="bar"><i id="loadBar"></i></div>
+<div id="loading" class="loading">
+  <div class="lbar"><i id="loadBar"></i></div>
+  <div id="loadMsg">자료 받는 중…</div>
 </div>
 
-
-<script src="vworld-key.js" onerror="window.VWORLD_KEY=null"></script>
+<script src="../flood/vworld-key.js" onerror="window.VWORLD_KEY=null"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -979,189 +975,431 @@ function wireControls(meta){
 
 }
 
-const SCEN_COLOR = {now:"#7e8984", att:"#ffd95a", wrn:"#e68920", alm:"#b8381a", srs:"#6e040b"};
-// 수심 색: 단일 색상(파랑) 명도 순차 — 얕음(밝음) → 깊음(어두움)
-const DEPTH_RAMP = ["#9fd8ef","#66b7e0","#3d92cd","#2a6fb0","#1d4f8f","#123467"];
+/* ---- 녹조(Chl-a) 리본 ----
+   낮은 값 파랑 → 높은 값 빨강. 수질·녹조 지도에서 널리 쓰는 방향이라 범례를 보지 않아도
+   읽힌다. 다만 저농도(파랑)가 물빛과 겹칠 위험이 있어 색차를 재고 골랐다(OKLab dE).
+
+     인접 단계 최소 dE 16.3   (이전 자홍 램프는 8.8 — 중간 단계가 서로 붙어 있었다)
+     장면 요소와 최소 dE 12.3 (청록 단계 vs 회색 지형. 리본은 물 위에 놓이므로
+                              실제로 겹치는 배경인 물과는 전 단계가 dE 20 이상)
+     저농도색 #2f6fe0 vs 물: 얕은 물 dE 32.6, 깊은 물 dE 25.2 — 물과 헷갈리지 않는다
+
+   데이터 값을 나타내는 면이므로 조명을 받지 않게 한다 — 음영이 끼면 같은 값이 자리에
+   따라 달라 보인다.
+
+   한계: 무지개형 램프는 값 차이를 실제보다 크거나 작게 보이게 하는 구간이 생긴다
+   (청록→초록 경계에서 특히). 정확한 값 비교는 리본 색이 아니라 지점 클릭으로 읽는다. */
+const CHLA_RAMP = ["#2f6fe0","#0e9aa8","#57c06b","#e8c93c","#ef7c1f","#c62317"];
+const RIBBON_HALF_W = 175;   // m. 하폭 중위 310 m 와 비슷한 폭으로 둔다
+const RIBBON_LIFT = 6;       // m. 수면 위로 살짝 띄워 물에 가리지 않게
+
+let chlaMesh = null, chlaMode = "all";
+
+function xy5186ToWorld(x, y){
+  return [x - X5186_0 - SPANX/2, (Y5186_0 - y) - SPANZ/2];
+}
+function elevAtWorld(wx, wz){
+  const c = Math.round((wx + SPANX/2) / RES), r = Math.round((wz + SPANZ/2) / RES);
+  if(c < 0 || r < 0 || c >= GW || r >= GH) return null;
+  return elevRender(r * GW + c);
+}
+function chlaColor(v, lo, hi){
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-6, hi - lo)));
+  const f = t * (CHLA_RAMP.length - 1);
+  const i = Math.min(CHLA_RAMP.length - 2, Math.floor(f));
+  return new THREE.Color(CHLA_RAMP[i]).lerp(new THREE.Color(CHLA_RAMP[i+1]), f - i);
+}
+
+// 조류경보 4지점 — 현재 등급을 색으로 띄운다. 확대해도 화면상 크기가 유지되게 배율을 맞춘다.
+const ALGAE_LV_FILL = {"정상":"#7e8984","관심":"#ffd95a","경계":"#b8381a","대발생":"#6e040b"};
+const algaeMarks = [];
+function drawAlgaeStations(){
+  if(!CHLA) return;
+  const rows = (ALGAE_NOW && ALGAE_NOW.rows) ? ALGAE_NOW.rows : [];
+  CHLA.stations.forEach(st=>{
+    const [wx, wz] = xy5186ToWorld(st.x, st.y);
+    const y = elevAtWorld(wx, wz);
+    if(y === null) return;
+    const r = rows.find(x => x.station === st.name);
+    const lv = r && r.level ? r.level : null;
+    const fill = new THREE.Color(lv ? (ALGAE_LV_FILL[lv] || "#7e8984") : "#5f7079");
+    const grp = new THREE.Group();
+    grp.position.set(wx, y + RIBBON_LIFT, wz);
+    const head = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0),
+      new THREE.MeshBasicMaterial({color: fill}));
+    head.position.y = 2.4;
+    grp.add(head);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6),
+      new THREE.MeshBasicMaterial({color: fill}));
+    stem.position.y = 1.2;
+    grp.add(stem);
+    grp.userData = {name: st.name, level: lv,
+      cells: r && r.cell_count != null ? Math.round(r.cell_count).toLocaleString() : null,
+      date: r && r.date ? r.date : null, approx: st.approx, basis: st.basis};
+    group.add(grp);
+    algaeMarks.push(grp);
+  });
+  scaleAlgae();
+  el("algaeNote").textContent =
+    `조류경보 ${algaeMarks.length}지점 표시 · ` +
+    (ALGAE_NOW ? "현재 등급 반영" : "등급 자료 없음(침수 기능은 정상)");
+}
+// 넓게 볼 때는 리본이 침수 수면(최대 14 m)에 가려 안 보인다. 보는 거리에 따라
+// 지면 위로 띄워, 전체 보기에서는 강 위에 떠 있는 띠로 읽히게 한다.
+function liftChla(){
+  if(!chlaMesh) return;
+  chlaMesh.position.y = Math.max(8, Math.min(320, orbit.dist * 0.0016));
+}
+
+function scaleAlgae(){
+  // 핀 전체 높이가 화면 높이의 1% 쯤 되게 맞춘다(local 단위로 약 3.4).
+  // SPANX(98 km) 비례로 잡았더니 전 구간 보기에서 산만큼 커졌다.
+  const k = Math.max(SPANX * 0.0012, Math.min(SPANX * 0.006, orbit.dist * 0.0030));
+  for(const g of algaeMarks) g.scale.setScalar(k);
+}
+
+function buildChla(){
+  if(chlaMesh){ group.remove(chlaMesh); chlaMesh.geometry.dispose(); chlaMesh.material.dispose(); chlaMesh = null; }
+  if(!CHLA || chlaMode === "off") return;
+  const key = chlaMode;
+  const segs = CHLA.segments.map(s=>{
+    const [wx, wz] = xy5186ToWorld(s.x, s.y);
+    return {wx, wz, v: s[key], y: elevAtWorld(wx, wz)};
+  }).filter(s => s.y !== null);
+  const rng = key === "jja" ? CHLA.range_jja : CHLA.range_all;
+  const [lo, hi] = rng;
+
+  // 인접 구간이 같은 꼭짓점을 쓰도록 이등분 법선을 계산한다(굽이에서 톱니가 생기지 않게)
+  const nx = new Float32Array(segs.length), nz = new Float32Array(segs.length);
+  for(let i = 0; i < segs.length; i++){
+    let dx, dz;
+    const a = segs[Math.max(0, i-1)], b = segs[Math.min(segs.length-1, i+1)];
+    dx = b.wx - a.wx; dz = b.wz - a.wz;
+    const L = Math.hypot(dx, dz) || 1;
+    nx[i] = -dz / L; nz[i] = dx / L;
+  }
+  const pos = [], col = [], idx = [];
+  const vi = new Int32Array(segs.length).fill(-1);
+  for(let i = 0; i < segs.length; i++){
+    const s = segs[i];
+    if(s.v === null || s.v === undefined) continue;
+    vi[i] = pos.length / 3 / 2;
+    const c = chlaColor(s.v, lo, hi);
+    for(const sg of [1, -1]){
+      pos.push(s.wx + nx[i]*RIBBON_HALF_W*sg, s.y + RIBBON_LIFT, s.wz + nz[i]*RIBBON_HALF_W*sg);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  for(let i = 0; i + 1 < segs.length; i++){
+    if(vi[i] < 0 || vi[i+1] < 0) continue;              // 값 없는 구간은 잇지 않는다
+    if(Math.hypot(segs[i+1].wx - segs[i].wx, segs[i+1].wz - segs[i].wz) > 800) continue;
+    const a = vi[i]*2, b = a+1, c2 = vi[i+1]*2, d = c2+1;
+    idx.push(a, c2, b, b, c2, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  chlaMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    vertexColors:true, side:THREE.DoubleSide, depthWrite:false }));
+  chlaMesh.renderOrder = 2;
+  group.add(chlaMesh);
+  liftChla();
+
+  el("chlaSwatches").innerHTML = `<i style="position:absolute;inset:0;background:linear-gradient(90deg,${CHLA_RAMP.join(",")})"></i>`;
+  el("chlaLo").textContent = lo.toFixed(0) + "%";
+  el("chlaMid").textContent = ((lo+hi)/2).toFixed(0) + "%";
+  el("chlaHi").textContent = hi.toFixed(0) + "%";
+}
+
+// 지형 메시. PlaneGeometry 대신 직접 만들어 격자 간격(meshStep)을 고를 수 있게 한다 —
+// 원본 30 m 격자는 정점 246만개라 약한 기기에서는 버겁다.
+
+
+/* ---- 녹조 페이지 UI ----
+   침수 페이지와 지형·카메라·조작·브이월드 타일을 공유하고(core.js), 여기서는 농도 표현만
+   얹는다. 표현은 두 가지다.
+
+     수면색 : 강물 자체를 농도색으로 칠한다. 수계가 한눈에 보이고 어디가 진한지 바로 읽힌다.
+     리본   : 수면 위에 띄운 띠. 물이 좁은 상류에서도 색이 보인다(침수 화면에서 쓰던 방식).
+
+   두 방식 모두 같은 값·같은 색을 쓴다(CHLA_RAMP). */
+
+let mode = "surface", period = "all", surfMesh = null;
+
+/* 최근접 구간 찾기 — 정점마다 1,340개를 다 뒤지면 250만 × 1,340 회가 되어 멈춘다.
+   2 km 격자에 구간 번호를 담아 두고 주변 9칸만 본다. */
+const SEGIDX = {cell: 2000, map: null, minx: 0, miny: 0, nx: 0, ny: 0};
+function buildSegIndex(){
+  const segs = CHLA.segments;
+  const xs = segs.map(s => s.x), ys = segs.map(s => s.y);
+  SEGIDX.minx = Math.min(...xs) - SEGIDX.cell;
+  SEGIDX.miny = Math.min(...ys) - SEGIDX.cell;
+  SEGIDX.nx = Math.ceil((Math.max(...xs) + SEGIDX.cell - SEGIDX.minx) / SEGIDX.cell) + 1;
+  SEGIDX.ny = Math.ceil((Math.max(...ys) + SEGIDX.cell - SEGIDX.miny) / SEGIDX.cell) + 1;
+  SEGIDX.map = Array.from({length: SEGIDX.nx * SEGIDX.ny}, () => []);
+  segs.forEach((s, i) => {
+    const cx = Math.floor((s.x - SEGIDX.minx) / SEGIDX.cell);
+    const cy = Math.floor((s.y - SEGIDX.miny) / SEGIDX.cell);
+    SEGIDX.map[cy * SEGIDX.nx + cx].push(i);
+  });
+}
+function nearestSeg(x, y, maxD){
+  if(!SEGIDX.map) buildSegIndex();
+  const cx = Math.floor((x - SEGIDX.minx) / SEGIDX.cell);
+  const cy = Math.floor((y - SEGIDX.miny) / SEGIDX.cell);
+  let best = -1, bd = maxD * maxD;
+  for(let dy = -1; dy <= 1; dy++){
+    for(let dx = -1; dx <= 1; dx++){
+      const gx = cx + dx, gy = cy + dy;
+      if(gx < 0 || gy < 0 || gx >= SEGIDX.nx || gy >= SEGIDX.ny) continue;
+      for(const i of SEGIDX.map[gy * SEGIDX.nx + gx]){
+        const s = CHLA.segments[i];
+        const d = (s.x - x) ** 2 + (s.y - y) ** 2;
+        if(d < bd){ bd = d; best = i; }
+      }
+    }
+  }
+  return best;
+}
+
+function segValue(s){ return period === "jja" ? s.jja : s.all; }
+function valueRange(){
+  const v = CHLA.segments.map(segValue).filter(x => x !== null && x !== undefined);
+  return [Math.min(...v), Math.max(...v)];
+}
+
+/* ---- 수면색 ---- */
+function buildChlaSurface(){
+  if(surfMesh){ group.remove(surfMesh); surfMesh.geometry.dispose(); surfMesh.material.dispose(); surfMesh = null; }
+  if(mode !== "surface" || !CHLA) return;
+  const D = DEPTHS["now"];
+  if(!D) return;
+  const {w, h} = TERR, res = META.res_m;
+  const x0 = -(w - 1) * res / 2, z0 = -(h - 1) * res / 2;
+  const [lo, hi] = valueRange();
+
+  const idxOf = new Int32Array(w * h).fill(-1);
+  const verts = [], cols = [], tris = [];
+  const st = meshStep;
+  // 강에서 3 km 넘게 떨어진 곳은 구간값을 붙이지 않는다(지류 골짜기까지 칠하지 않게)
+  const MAXD = 3000;
+  for(let r = 0; r < h; r += st){
+    for(let c = 0; c < w; c += st){
+      const i = r * w + c;
+      const d = D.v[i] * META.depth_scale;
+      if(d <= 0) continue;
+      if(DIST && DIST.v[i] * (META.dist_scale || 1) > distLimit) continue;
+      const x5 = X5186_0 + c * RES, y5 = Y5186_0 - r * RES;
+      const si = nearestSeg(x5, y5, MAXD);
+      const v = si < 0 ? null : segValue(CHLA.segments[si]);
+      idxOf[i] = verts.length / 3;
+      verts.push(x0 + c * res, elevRender(i) + d + 1.5, z0 + r * res);
+      const col = v === null || v === undefined
+        ? new THREE.Color("#5b7480")            // 값이 없는 구간(여름 결측 등)
+        : chlaColor(v, lo, hi);
+      cols.push(col.r, col.g, col.b);
+    }
+  }
+  for(let r = 0; r + st < h; r += st){
+    for(let c = 0; c + st < w; c += st){
+      const a = idxOf[r*w + c], b = idxOf[r*w + c + st];
+      const cc = idxOf[(r+st)*w + c], dd = idxOf[(r+st)*w + c + st];
+      if(a < 0 || b < 0 || cc < 0 || dd < 0) continue;
+      tris.push(a, cc, b, b, cc, dd);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+  g.setIndex(tris);
+  // 값을 나타내는 면이라 조명을 받지 않게 한다 — 음영이 끼면 같은 값이 달라 보인다.
+  surfMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors:true}));
+  surfMesh.renderOrder = 2;
+  group.add(surfMesh);
+}
+
+function applyMode(){
+  chlaMode = (mode === "ribbon") ? period : "off";    // chla.js 의 리본은 mode 로 기간을 받는다
+  buildChla();
+  buildChlaSurface();
+}
+
+/* ---- 가리킨 지점: 그 자리의 구간값을 읽는다 ---- */
 function updateReadout(clientX, clientY){
   const body = el("roBody");
   const g = pickPoint(clientX, clientY);
-  if(!g){
-    body.innerHTML = `<div class="ro-none">지형 바깥입니다. 지형 위에 마우스를 올려주세요.</div>`;
-    return;
-  }
+  if(!g){ body.innerHTML = `<div class="ro-none">지형 바깥입니다.</div>`; return; }
   const i = g.r * GW + g.c;
-  const elev = elevAt(i);
-  const D = DEPTHS[current];
-  let depth = D ? D.v[i] * META.depth_scale : 0;
-  const distKm = DIST ? DIST.v[i] * (META.dist_scale || 1) / 1000 : null;
-  if(DIST && distKm * 1000 > distLimit) depth = 0;     // 화면에서 잘라낸 곳은 0 으로 읽는다
-  const lon = META.bounds_4326[0] + (g.c/(GW-1)) * (META.bounds_4326[2] - META.bounds_4326[0]);
-  const lat = META.bounds_4326[3] - (g.r/(GH-1)) * (META.bounds_4326[3] - META.bounds_4326[1]);
-  // 하도 화소(본류 거리 0)는 DEM 값이 하상이 아니라 레이더 촬영 당시 수면이다
-  const inChannel = distKm !== null && distKm === 0;
-  const ch = META.channel || {};
-  body.innerHTML = `
-    <div class="ro-row ro-depth"><span>${inChannel ? "수면 대비 수심" : "수심"}</span>
-      <b style="color:${depth > 0 ? "#2a6fb0" : "var(--ink-3)"}">${depth > 0 ? depth.toFixed(2)+" m" : "잠기지 않음"}</b></div>
-    <div class="ro-row"><span>${inChannel ? "DEM 표고(수면)" : "지면 표고"}</span><b>${elev.toFixed(1)} m</b></div>
-    ${depth > 0 ? `<div class="ro-row"><span>수면 표고</span><b>${(elev+depth).toFixed(1)} m</b></div>` : ""}
-    <div class="ro-row"><span>본류 거리</span><b>${distKm === null ? "–" : distKm.toFixed(1)+" km"}</b></div>
-    <div class="ro-row"><span>좌표</span><b style="font-size:11px">${lat.toFixed(4)}, ${lon.toFixed(4)}</b></div>
-    ${inChannel ? `<div class="ro-warn"><b>하도 안입니다.</b> 이 표고는 하상이 아니라
-      레이더가 찍은 <b>당시 수면</b>입니다 — 레이더는 물을 투과하지 못합니다.
-      실제 하상은 이보다 더 아래이고(담수역 평균수심 ${ch.pool_mean_depth_m ?? "–"} m),
-      여기 적힌 수심은 하상까지의 깊이가 아닙니다.</div>` : ""}`;
-  if(!pickMark){
-    pickMark = new THREE.Mesh(new THREE.SphereGeometry(RES*1.2, 12, 8),
-                              new THREE.MeshBasicMaterial({color:0x2fb6bd}));
-    pickMark.renderOrder = 2;
-    group.add(pickMark);
-  }
-  pickMark.visible = true;
-  pickMark.position.set(-SPANX/2 + g.c*RES, elev + depth, -SPANZ/2 + g.r*RES);
-  pickMark.scale.setScalar(Math.max(0.6, orbit.dist / SPANX * 2.2));
-}
-let pickMark = null;
-// ---------- UI ----------
-function buildUI(meta){
-  el("reachLabel").textContent =
-    `낙동강 본류 전 구간 (하구둑~영강합류부, 종단 ${meta.reach.s_lo}~${meta.reach.s_hi} km)`
-    + ` · 지형격자 ${meta.res_m} m`;
-
-  const list = el("scenList");
-  meta.scenarios.forEach(s=>{
-    const b = document.createElement("button");
-    b.dataset.key = s.key;
-    b.setAttribute("aria-pressed", "false");
-    b.innerHTML = `<i style="background:${SCEN_COLOR[s.key]}"></i>`
-      + `<span class="nm">${s.label}</span>`
-      + `<span class="km2 mono">${s.area_km2} km²</span>`;
-    b.addEventListener("click", ()=> select(s.key));
-    list.appendChild(b);
-  });
-
-  const go = el("goto");
-  const goItems = [];
-  (meta.gauges || []).filter(g => g.x !== undefined).forEach(g =>
-    goItems.push({x:g.x, y:g.y, s:g.s, label:`${g.name} · ${g.s.toFixed(1)}km`}));
-  goItems.sort((a, b) => a.s - b.s).forEach(it=>{
-    const o = document.createElement("option");
-    o.value = `${it.x},${it.y}`;
-    o.textContent = it.label;
-    go.appendChild(o);
-  });
-  go.addEventListener("change", ()=>{
-    if(!go.value){ frameCamera(SPANX, SPANZ); return; }   // 전체 보기로 복귀
-    const [gx, gy] = go.value.split(",").map(Number);
-    // 5186 → 격자 인덱스 → 화면(world) 좌표. 정점은 화소 중심에 있다.
-    const c = Math.round((gx - X5186_0) / RES), r = Math.round((Y5186_0 - gy) / RES);
-    if(c < 0 || r < 0 || c >= GW || r >= GH) return;
-    orbit.target.set(-SPANX/2 + c*RES, elevAt(r*GW + c) * vex, -SPANZ/2 + r*RES);
-    orbit.dist = SPANX * 0.09;
-    orbit.phi = 0.42;
-    applyCamera();
-  });
-
-  wireControls(meta);
-
-  const tex = meta.texture;
-  el("methodNote").innerHTML = `
-    <b>해발표고 = 관측수위 + 수위표 영점표고(gdt).</b> 담수역별 관심수위 표고가 하류→상류로
-    단조 증가하고(3.1→48.6 m), DEM 수면과 평균 +0.71 m 차이로 맞는 것을 확인했습니다.<br><br>
-    <b>수면종단</b>은 담수역(보~보) 안에서만 관측소 표고를 종단거리로 선형보간했습니다.
-    기관이 지점별로 정한 기준수위는 서로 정합되지 않아 종단이 역전되는 곳이 있어,
-    등위회귀로 최소한만 단조 보정했습니다(보정된 지점 수는 아래 표기).<br><br>
-    <b>침수 판정</b>은 각 화소에 가장 가까운 하도의 수면표고를 주고 DEM 보다 높으면 잠긴 것으로
-    보되, 하도와 이어지지 않은 고립 저지대는 제외했습니다.<br><br>
-    지형: Copernicus DEM GLO-30 (30 m, 화면은 ${meta.res_m} m 로 축소).
-    ${tex ? `위성: Sentinel-2 L2A ${tex.scenes.map(s=>s.date).join(", ")} (운량 ${tex.scenes[0].cloud}%).` : ""}
-    수위: 한강홍수통제소 Open API.`;
+  const x5 = X5186_0 + g.c * RES, y5 = Y5186_0 - g.r * RES;
+  const si = nearestSeg(x5, y5, 4000);
+  const seg = si < 0 ? null : CHLA.segments[si];
+  const d = DEPTHS["now"] ? DEPTHS["now"].v[i] * META.depth_scale : 0;
+  body.innerHTML = seg ? `
+    <div class="ro-row ro-depth"><span>초과빈도 (${period === "jja" ? "여름" : "전기간"})</span>
+      <b>${segValue(seg) === null ? "자료 없음" : segValue(seg).toFixed(1) + " %"}</b></div>
+    <div class="ro-row"><span>종단거리</span><b>${seg.s.toFixed(1)} km</b></div>
+    <div class="ro-row"><span>담수역</span><b>${seg.pool}</b></div>
+    <div class="ro-row"><span>현재 수위 수심</span><b>${d > 0 ? d.toFixed(2) + " m" : "잠기지 않음"}</b></div>`
+    : `<div class="ro-none">가까운 본류 구간이 없습니다(4 km 밖).</div>`;
 }
 
-function select(key){
-  current = key;
-  try{ history.replaceState(null, "", "?s=" + key); }catch(e){}
-  const s = META.scenarios.find(x => x.key === key);
-  document.querySelectorAll("#scenList button").forEach(b=>
-    b.setAttribute("aria-pressed", String(b.dataset.key === key)));
-  const maxD = buildWater(key);
-  el("stArea").textContent = s.area_km2;
-  el("stOff").textContent = s.offchannel_km2;
-  el("stDepth").textContent = s.depth_mean_m ?? "–";
-  el("stMax").textContent = s.max_depth_m ?? "–";
-  el("swMax").textContent = maxD.toFixed(1) + " m";
-  el("swMid").textContent = (maxD/2).toFixed(1) + " m";
-  el("depthSwatches").innerHTML = `<i style="background:linear-gradient(90deg,${
-    Array.from({length:9}, (_, k) => waterCss(maxD * k/8, k/8*100)).join(",")})"></i>`;
-
-  const adj = s.adjusted_gauges;
-  el("valNote").innerHTML = `
-    이 시나리오의 침수역 중 <b>${s.gsw_any_precision}%</b> 가 위성이 관측한 수면 흔적
-    (JRC Global Surface Water) 위에 있고, 상시수면의 <b>${s.gsw_permanent_recall}%</b> 를 재현합니다.
-    시나리오가 커질수록 앞 수치가 낮아지는 것은 정상입니다 — 홍수터는 평소 물이 없으니까요.<br><br>
-    단조 보정된 관측소 ${adj}개 · 하도 비연결 고립부 ${s.dropped_isolated_km2} km² 제외.<br><br>
-    <b>수리모형이 아닙니다.</b> DEM 이 수목·건물 높이를 포함하는 DSM 이고(침수 과소추정),
-    30 m 로는 제방·도로를 해상하지 못하며, 통수능·부정류 계산이 없습니다.
-    특정 지점의 침수 여부 판정에는 쓸 수 없는 <b>지형 기반 근사</b>입니다.<br><br>
-    <b>하도 안의 수심은 실제 하천 수심이 아닙니다.</b> Copernicus DEM 은 레이더 기반이라
-    물을 투과하지 못해, 하도 화소의 표고는 하상이 아니라 촬영 당시 수면입니다.
-    실제로 이 구간 하도의 DEM 표고는 43 km 내내 4.0 m 근처로 거의 평평한데(표준편차 0.59 m),
-    하상이라면 여울과 소로 훨씬 크게 흩어져야 합니다. 담수역 평균수심은 6.32 m 이므로
-    하상은 그만큼 더 아래에 있습니다. 하도 밖 홍수터의 수심은 이 문제가 없습니다.<br><br>
-    특히 <b>지류 골짜기 안쪽까지 물이 차 보이는 것</b>은 모든 지점에 가장 가까운 본류 수면표고를
-    그대로 적용했기 때문입니다. 실제로는 합류부에서 멀어질수록 배수위 영향이 줄어들므로,
-    본류에서 먼 골짜기의 침수는 과대표시입니다 —
-    <b>'본류 거리' 슬라이더</b>로 표시 범위를 좁혀 확인해 보세요.`;
+/* ---- 이동 ---- */
+function flyTo(x5, y5, near){
+  const c = Math.round((x5 - X5186_0) / RES), r = Math.round((Y5186_0 - y5) / RES);
+  if(c < 0 || r < 0 || c >= GW || r >= GH) return;
+  orbit.target.set(-SPANX/2 + c*RES, elevAt(r*GW + c) * vex, -SPANZ/2 + r*RES);
+  orbit.dist = SPANX * (near || 0.09);
+  orbit.phi = 0.42;
+  applyCamera();
 }
 
+/* ---- 종단 분포 그래프 ---- */
+function drawProfile(){
+  const box = el("profile");
+  if(!CHLA){ box.innerHTML = ""; return; }
+  const W = 250, H = 92, PAD = 16;
+  const pts = CHLA.segments.filter(s => segValue(s) !== null && segValue(s) !== undefined);
+  if(!pts.length){ box.innerHTML = `<div class="ro-none">이 기간 자료가 없습니다.</div>`; return; }
+  const smax = Math.max(...pts.map(s => s.s)), vmax = Math.max(...pts.map(segValue));
+  const X = s => PAD + (s / smax) * (W - PAD - 4);
+  const Y = v => H - 14 - (v / vmax) * (H - 26);
+  const path = pts.map((s, i) => `${i ? "L" : "M"}${X(s.s).toFixed(1)},${Y(segValue(s)).toFixed(1)}`).join("");
+  const top = [...pts].sort((a, b) => segValue(b) - segValue(a)).slice(0, 5);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
+      aria-label="종단거리별 Chl-a 초과빈도">
+    <line x1="${PAD}" y1="${H-14}" x2="${W-4}" y2="${H-14}" stroke="#2b414b"/>
+    <path d="${path}" fill="none" stroke="#2fb6bd" stroke-width="1.2"/>
+    ${top.map(s => `<circle cx="${X(s.s).toFixed(1)}" cy="${Y(segValue(s)).toFixed(1)}" r="2.6"
+        fill="${"#" + chlaColor(segValue(s), ...valueRange()).getHexString()}"
+        stroke="#0d1518" stroke-width="0.8"><title>${s.s} km · ${segValue(s)}%</title></circle>`).join("")}
+    <text x="${PAD}" y="${H-3}" fill="#72898d" font-size="8">하구 0</text>
+    <text x="${W-4}" y="${H-3}" fill="#72898d" font-size="8" text-anchor="end">${smax.toFixed(0)} km</text>
+    <text x="${PAD}" y="10" fill="#72898d" font-size="8">최대 ${vmax.toFixed(0)}%</text>
+  </svg>`;
+  box.querySelector("svg").addEventListener("click", ev => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    const sx = ((ev.clientX - r.left) / r.width) * W;
+    const s = ((sx - PAD) / (W - PAD - 4)) * smax;
+    const near = pts.reduce((b, p) => Math.abs(p.s - s) < Math.abs(b.s - s) ? p : b, pts[0]);
+    flyTo(near.x, near.y);
+  });
+}
 
-/* ---- 담수역(보 구간) 30 m 보기 ----
-   전 구간은 정점 2,000만개라 90 m 로 솎아 쓴다(10d). 확대하면 지형이 90 m 계단으로 보여
-   물가 선이 뭉개진다. 담수역 하나면 30 m 로도 정점이 0.4~2.7M 이라 감당된다(10f).
+/* ---- 목록 ---- */
+function drawHotList(){
+  const box = el("hotList");
+  const pts = CHLA.segments.filter(s => segValue(s) !== null && segValue(s) !== undefined);
+  const top = [...pts].sort((a, b) => segValue(b) - segValue(a)).slice(0, 10);
+  const [lo, hi] = valueRange();
+  box.innerHTML = top.map(s => `
+    <button class="hot" data-x="${s.x}" data-y="${s.y}">
+      <i style="background:${"#" + chlaColor(segValue(s), lo, hi).getHexString()}"></i>
+      <span class="nm">${s.s.toFixed(1)} km<small>담수역 ${s.pool}</small></span>
+      <b class="mono">${segValue(s).toFixed(1)}%</b>
+    </button>`).join("");
+  box.querySelectorAll(".hot").forEach(b => b.addEventListener("click",
+    () => flyTo(Number(b.dataset.x), Number(b.dataset.y))));
+}
 
-   구간을 바꿀 때는 페이지를 다시 연다. 장면을 살려둔 채 격자를 갈아끼우면 메시·텍스처·
-   타일 캐시를 모두 정리해야 해서 실수가 끼기 쉽다 — 다시 여는 쪽이 확실하다. */
+function drawStationList(){
+  const box = el("stationList");
+  const sts = (CHLA && CHLA.stations) || [];
+  const now = {};
+  ((ALGAE_NOW && ALGAE_NOW.rows) || []).forEach(r => { now[r.station] = r; });
+  box.innerHTML = sts.map(s => {
+    const r = now[s.name];
+    return `<button class="hot" data-x="${s.x}" data-y="${s.y}">
+      <i style="background:${r && ALGAE_LV_FILL[r.level] || "#3a4a4f"}"></i>
+      <span class="nm">${s.name}<small>${s.s.toFixed(1)} km</small></span>
+      <b class="mono">${r && r.level ? r.level : "–"}</b>
+    </button>`;
+  }).join("");
+  box.querySelectorAll(".hot").forEach(b => b.addEventListener("click",
+    () => flyTo(Number(b.dataset.x), Number(b.dataset.y))));
+  el("algaeNote").textContent = ALGAE_NOW
+    ? `조류경보 단계는 ${ALGAE_NOW.updated_at.slice(0, 10)} 수집분입니다.`
+    : "조류경보 현황을 불러오지 못했습니다.";
+}
+
+/* ---- 담수역 선택 (침수 페이지와 같은 방식) ---- */
 const POOL = new URLSearchParams(location.search).get("pool");
-const POOL_BASE = POOL !== null && /^[0-8]$/.test(POOL) ? `pools/p${POOL}/` : "";
+const POOL_BASE = POOL !== null && /^[0-8]$/.test(POOL) ? `../flood/pools/p${POOL}/` : "../flood/";
 
 async function buildPoolPicker(){
   const box = el("poolPick");
-  if(!box) return;
   let idx = null;
   try{
-    const r = await fetch("pools/index.json", {cache:"no-store"});
+    const r = await fetch("../flood/pools/index.json", {cache:"no-store"});
     if(r.ok) idx = await r.json();
-  }catch(e){ /* 고해상도 자료가 아직 없으면 전 구간만 쓴다 */ }
+  }catch(e){ /* 없으면 전 구간만 */ }
   if(!idx){ box.innerHTML = `<div class="ro-none">구간 자료가 아직 없습니다.</div>`; return; }
-
-  const cur = POOL_BASE ? Number(POOL) : null;
+  const cur = POOL !== null ? Number(POOL) : null;
   const mk = (label, sub, href, on) =>
     `<a class="poolbtn${on ? " on" : ""}" href="${href}"><span class="nm">${label}</span>` +
     `<span class="km2 mono">${sub}</span></a>`;
-  box.innerHTML =
-    mk("전 구간", `90 m · 268 km`, "?", cur === null) +
-    idx.pools.map(p => mk(`담수역 ${p.pool}`,
-      `30 m · ${p.s_range_km[0]}~${p.s_range_km[1]}km`,
-      `?pool=${p.pool}`, cur === p.pool)).join("");
+  box.innerHTML = mk("전 구간", "90 m · 268 km", "?", cur === null)
+    + idx.pools.map(p => mk(`담수역 ${p.pool}`, `30 m · ${p.s_range_km[0]}~${p.s_range_km[1]}km`,
+                            `?pool=${p.pool}`, cur === p.pool)).join("");
 }
 
 const PAGE = {
   base: POOL_BASE,
-  chlaUrl: null,                       // 녹조는 chla/ 페이지에서 본다
-  algaeUrl: null,
+  chlaUrl: "../flood/chla.json",
+  algaeUrl: "../data/algae_latest.json",
   buildUI(meta){
-    buildUI(meta);
+    el("reachLabel").textContent = POOL !== null
+      ? `담수역 ${POOL} (종단 ${meta.s_range_km[0]}~${meta.s_range_km[1]} km) · 지형격자 ${meta.res_m} m`
+      : `본류 전 구간 (0~${meta.reach.s_hi} km) · 지형격자 ${meta.res_m} m`;
     buildPoolPicker();
-    if(POOL_BASE){
-      el("reachLabel").textContent =
-        `담수역 ${POOL} (종단 ${meta.s_range_km[0]}~${meta.s_range_km[1]} km) · 지형격자 ${meta.res_m} m`;
+    wireControls(meta);
+
+    if(!CHLA){
+      el("chlaMode").innerHTML = `<div class="ro-none">녹조 자료(chla.json)를 불러오지 못했습니다.</div>`;
+      return;
     }
+    el("chlaAllR").textContent = `${CHLA.range_all[0]}~${CHLA.range_all[1]}%`;
+    el("chlaJjaR").textContent = `${CHLA.range_jja[0]}~${CHLA.range_jja[1]}%`;
+
+    const syncBtns = () => {
+      document.querySelectorAll("#chlaMode button").forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset.m === mode)));
+      document.querySelectorAll("#chlaPeriod button").forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset.p === period)));
+    };
+    document.querySelectorAll("#chlaMode button").forEach(b =>
+      b.addEventListener("click", () => { mode = b.dataset.m; syncBtns(); applyMode(); }));
+    document.querySelectorAll("#chlaPeriod button").forEach(b =>
+      b.addEventListener("click", () => {
+        period = b.dataset.p; syncBtns(); applyMode(); drawHotList(); drawProfile(); drawLegend();
+      }));
+    syncBtns();
   },
   onReady(meta){
-    const want = new URLSearchParams(location.search).get("s");
-    select(meta.scenarios.some(x => x.key === want) ? want : meta.scenarios[0].key);
+    current = "now";              // 녹조는 '현재 수위' 수면 위에서 본다
+    buildWater(current);
+    if(!CHLA) return;
+    applyMode();
+    drawAlgaeStations();
+    drawHotList();
+    drawStationList();
+    drawProfile();
+    drawLegend();
   },
 };
+
+function drawLegend(){
+  const [lo, hi] = valueRange();
+  el("chlaSwatches").innerHTML =
+    `<i style="position:absolute;inset:0;background:linear-gradient(90deg,${CHLA_RAMP.join(",")})"></i>`;
+  el("chlaLo").textContent = lo.toFixed(0) + "%";
+  el("chlaMid").textContent = ((lo + hi) / 2).toFixed(0) + "%";
+  el("chlaHi").textContent = hi.toFixed(0) + "%";
+}
+
+
+/* 격자 간격·표시 범위가 바뀌면 수면색도 같은 격자로 다시 만든다(controls.js 가 부른다). */
+function onGridChange(){ buildChlaSurface(); }
 
 boot();
 })();

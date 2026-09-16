@@ -1,0 +1,223 @@
+{
+ "pool": 5,
+ "grid": {
+  "w": 591,
+  "h": 1210,
+  "down": 1
+ },
+ "res_m": 30.0,
+ "elev_offset_m": 18.5,
+ "encoding": "rgb16",
+ "elev_scale": 0.1,
+ "depth_scale": 0.01,
+ "dist_file": "dist.png",
+ "dist_scale": 1.0,
+ "bounds_5186": [
+  314984.653251495,
+  374802.0461243596,
+  332714.653251495,
+  411102.0461243596
+ ],
+ "bounds_4326": [
+  128.27467590791022,
+  35.964006119457764,
+  128.47728578147624,
+  36.28879019095889
+ ],
+ "extent_m": [
+  17730.0,
+  36300.0
+ ],
+ "elev_range_m": [
+  18.5,
+  968.6
+ ],
+ "s_range_km": [
+  191.5,
+  219.1
+ ],
+ "reach": {
+  "s_lo": 191.5,
+  "s_hi": 219.1
+ },
+ "channel": {
+  "dem_median_el_m": 7.75,
+  "dem_sd_m": 1.26,
+  "dem_is_water_surface": true,
+  "current_wse_median_el_m": 11.26,
+  "pool_mean_depth_m": 6.4,
+  "note": "하도 화소의 DEM 은 하상이 아니라 레이더 촬영 당시 수면이다(레이더는 물을 투과하지 못함). 하도 안의 수심 값은 '그 수면 대비'이며 실제 하상까지의 깊이가 아니다. 담수역 평균수심은 06_기초통계 §7."
+ },
+ "gauges": [
+  {
+   "name": "칠곡군(호국의다리)",
+   "s": 189.7,
+   "pool": 4,
+   "dist_km": 0.09,
+   "gdt": 11.532,
+   "x": 325706.6,
+   "y": 378974.5,
+   "now": 18.292,
+   "att": 19.992,
+   "wrn": 23.132,
+   "alm": 24.632,
+   "srs": 27.342
+  },
+  {
+   "name": "칠곡군(칠곡보하)",
+   "s": 191.1,
+   "pool": 4,
+   "dist_km": 0.22,
+   "gdt": 0.0,
+   "x": 325760.2,
+   "y": 380486.0,
+   "now": 18.32,
+   "att": 20.0,
+   "wrn": 24.1,
+   "alm": 26.0,
+   "srs": 27.88
+  },
+  {
+   "name": "칠곡군(칠곡보상)",
+   "s": 191.5,
+   "pool": 5,
+   "dist_km": 0.22,
+   "gdt": 0.0,
+   "x": 325830.0,
+   "y": 380857.0,
+   "now": 25.62,
+   "att": 26.0,
+   "wrn": 27.6,
+   "alm": 28.0,
+   "srs": 29.06
+  },
+  {
+   "name": "구미시(구미대교)",
+   "s": 202.9,
+   "pool": 5,
+   "dist_km": 0.04,
+   "gdt": 23.826,
+   "x": 325756.0,
+   "y": 391246.1,
+   "now": 25.666,
+   "att": 25.996,
+   "wrn": 28.426,
+   "alm": 29.426,
+   "srs": 30.446
+  },
+  {
+   "name": "강창1",
+   "s": 218.7,
+   "pool": 5,
+   "dist_km": 0.41,
+   "gdt": 30.279,
+   "x": 320869.6,
+   "y": 404465.6,
+   "now": null,
+   "att": null,
+   "wrn": null,
+   "alm": null,
+   "srs": null
+  },
+  {
+   "name": "구미시(구미보하)",
+   "s": 218.9,
+   "pool": 5,
+   "dist_km": 0.25,
+   "gdt": 0.0,
+   "x": 320864.9,
+   "y": 404804.7,
+   "now": 25.65,
+   "att": 29.25,
+   "wrn": 31.2,
+   "alm": 33.0,
+   "srs": 35.06
+  },
+  {
+   "name": "구미시(구미보상)",
+   "s": 219.7,
+   "pool": 6,
+   "dist_km": 0.34,
+   "gdt": 0.0,
+   "x": 320433.1,
+   "y": 405322.8,
+   "now": 32.61,
+   "att": 33.0,
+   "wrn": 34.5,
+   "alm": 35.0,
+   "srs": 36.26
+  }
+ ],
+ "texture": {
+  "file": "texture.jpg",
+  "size": [
+   1773,
+   3630
+  ],
+  "scenes": [
+   {
+    "id": "S2B_MSIL2A_20240518T020649_R103_T52SDE_20240518T054112",
+    "date": "2024-05-18",
+    "cloud": 0.0
+   },
+   {
+    "id": "S2C_MSIL2A_20250322T021601_R003_T52SDF_20250322T062116",
+    "date": "2025-03-22",
+    "cloud": 0.0
+   }
+  ],
+  "coverage_pct": 100.0
+ },
+ "scenarios": [
+  {
+   "key": "now",
+   "label": "현재 수위",
+   "file": "depth_now.png",
+   "max_depth_m": 6.65,
+   "area_km2": 15.48,
+   "offchannel_km2": 2.13,
+   "depth_mean_m": 3.54,
+   "depth_p95_m": 6.64
+  },
+  {
+   "key": "att",
+   "label": "관심수위",
+   "file": "depth_att.png",
+   "max_depth_m": 7.0,
+   "area_km2": 20.2,
+   "offchannel_km2": 4.48,
+   "depth_mean_m": 3.75,
+   "depth_p95_m": 7.0
+  },
+  {
+   "key": "wrn",
+   "label": "주의수위",
+   "file": "depth_wrn.png",
+   "max_depth_m": 9.25,
+   "area_km2": 27.71,
+   "offchannel_km2": 11.92,
+   "depth_mean_m": 4.61,
+   "depth_p95_m": 9.02
+  },
+  {
+   "key": "alm",
+   "label": "경계수위",
+   "file": "depth_alm.png",
+   "max_depth_m": 10.13,
+   "area_km2": 32.52,
+   "offchannel_km2": 16.72,
+   "depth_mean_m": 4.91,
+   "depth_p95_m": 9.68
+  },
+  {
+   "key": "srs",
+   "label": "심각수위",
+   "file": "depth_srs.png",
+   "max_depth_m": 11.15,
+   "area_km2": 48.68,
+   "offchannel_km2": 32.89,
+   "depth_mean_m": 4.62,
+   "depth_p95_m": 10.57
+  }
+ ]
+}

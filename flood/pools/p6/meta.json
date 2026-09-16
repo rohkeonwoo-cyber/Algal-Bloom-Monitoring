@@ -1,0 +1,218 @@
+{
+ "pool": 6,
+ "grid": {
+  "w": 594,
+  "h": 852,
+  "down": 1
+ },
+ "res_m": 30.0,
+ "elev_offset_m": 24.0,
+ "encoding": "rgb16",
+ "elev_scale": 0.1,
+ "depth_scale": 0.01,
+ "dist_file": "dist.png",
+ "dist_scale": 1.0,
+ "bounds_5186": [
+  309104.653251495,
+  399252.0461243596,
+  326924.653251495,
+  424812.0461243596
+ ],
+ "bounds_4326": [
+  128.21288431810683,
+  36.184980271956235,
+  128.41508765069082,
+  36.413083164921865
+ ],
+ "extent_m": [
+  17820.0,
+  25560.0
+ ],
+ "elev_range_m": [
+  24.0,
+  694.2
+ ],
+ "s_range_km": [
+  219.3,
+  236.9
+ ],
+ "reach": {
+  "s_lo": 219.3,
+  "s_hi": 236.9
+ },
+ "channel": {
+  "dem_median_el_m": 7.75,
+  "dem_sd_m": 1.26,
+  "dem_is_water_surface": true,
+  "current_wse_median_el_m": 11.26,
+  "pool_mean_depth_m": 6.4,
+  "note": "하도 화소의 DEM 은 하상이 아니라 레이더 촬영 당시 수면이다(레이더는 물을 투과하지 못함). 하도 안의 수심 값은 '그 수면 대비'이며 실제 하상까지의 깊이가 아니다. 담수역 평균수심은 06_기초통계 §7."
+ },
+ "gauges": [
+  {
+   "name": "강창1",
+   "s": 218.7,
+   "pool": 5,
+   "dist_km": 0.41,
+   "gdt": 30.279,
+   "x": 320869.6,
+   "y": 404465.6,
+   "now": null,
+   "att": null,
+   "wrn": null,
+   "alm": null,
+   "srs": null
+  },
+  {
+   "name": "구미시(구미보하)",
+   "s": 218.9,
+   "pool": 5,
+   "dist_km": 0.25,
+   "gdt": 0.0,
+   "x": 320864.9,
+   "y": 404804.7,
+   "now": 25.65,
+   "att": 29.25,
+   "wrn": 31.2,
+   "alm": 33.0,
+   "srs": 35.06
+  },
+  {
+   "name": "구미시(구미보상)",
+   "s": 219.7,
+   "pool": 6,
+   "dist_km": 0.34,
+   "gdt": 0.0,
+   "x": 320433.1,
+   "y": 405322.8,
+   "now": 32.61,
+   "att": 33.0,
+   "wrn": 34.5,
+   "alm": 35.0,
+   "srs": 36.26
+  },
+  {
+   "name": "강창2",
+   "s": 222.5,
+   "pool": 6,
+   "dist_km": 0.81,
+   "gdt": 0.0,
+   "x": 319815.5,
+   "y": 408459.1,
+   "now": null,
+   "att": null,
+   "wrn": null,
+   "alm": null,
+   "srs": null
+  },
+  {
+   "name": "구미시(일선교)",
+   "s": 223.7,
+   "pool": 6,
+   "dist_km": 0.05,
+   "gdt": 30.788,
+   "x": 320654.4,
+   "y": 409179.9,
+   "now": 32.608,
+   "att": 32.998,
+   "wrn": 35.188,
+   "alm": 36.088,
+   "srs": 37.028
+  },
+  {
+   "name": "의성군(낙단교)",
+   "s": 236.5,
+   "pool": 6,
+   "dist_km": 0.08,
+   "gdt": 27.145,
+   "x": 316784.2,
+   "y": 418499.8,
+   "now": 32.585,
+   "att": 35.445,
+   "wrn": 36.145,
+   "alm": 37.645,
+   "srs": 40.515
+  },
+  {
+   "name": "의성군(낙단보상)",
+   "s": 237.3,
+   "pool": 7,
+   "dist_km": 0.6,
+   "gdt": 0.0,
+   "x": 317856.8,
+   "y": 418483.5,
+   "now": 39.76,
+   "att": 40.5,
+   "wrn": 42.4,
+   "alm": 43.0,
+   "srs": 44.15
+  }
+ ],
+ "texture": {
+  "file": "texture.jpg",
+  "size": [
+   1782,
+   2556
+  ],
+  "scenes": [
+   {
+    "id": "S2C_MSIL2A_20250322T021601_R003_T52SDF_20250322T062116",
+    "date": "2025-03-22",
+    "cloud": 0.0
+   }
+  ],
+  "coverage_pct": 100.0
+ },
+ "scenarios": [
+  {
+   "key": "now",
+   "label": "현재 수위",
+   "file": "depth_now.png",
+   "max_depth_m": 2.61,
+   "area_km2": 13.62,
+   "offchannel_km2": 2.25,
+   "depth_mean_m": 1.56,
+   "depth_p95_m": 2.6
+  },
+  {
+   "key": "att",
+   "label": "관심수위",
+   "file": "depth_att.png",
+   "max_depth_m": 5.09,
+   "area_km2": 17.37,
+   "offchannel_km2": 4.63,
+   "depth_mean_m": 2.49,
+   "depth_p95_m": 4.57
+  },
+  {
+   "key": "wrn",
+   "label": "주의수위",
+   "file": "depth_wrn.png",
+   "max_depth_m": 7.06,
+   "area_km2": 23.96,
+   "offchannel_km2": 11.13,
+   "depth_mean_m": 3.57,
+   "depth_p95_m": 6.3
+  },
+  {
+   "key": "alm",
+   "label": "경계수위",
+   "file": "depth_alm.png",
+   "max_depth_m": 8.82,
+   "area_km2": 29.13,
+   "offchannel_km2": 16.29,
+   "depth_mean_m": 3.99,
+   "depth_p95_m": 7.75
+  },
+  {
+   "key": "srs",
+   "label": "심각수위",
+   "file": "depth_srs.png",
+   "max_depth_m": 10.83,
+   "area_km2": 42.46,
+   "offchannel_km2": 29.59,
+   "depth_mean_m": 4.07,
+   "depth_p95_m": 9.22
+  }
+ ]
+}
