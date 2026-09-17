@@ -1,21 +1,18 @@
 
 <div id="stage"></div>
 
-<div class="hud topbar">
+<header class="hud topbar">
   <h1 class="display">낙동강 녹조 분포</h1>
   <span class="sub" id="reachLabel">낙동강 본류</span>
+  <nav class="page-links" aria-label="화면 이동">
   <a href="../flood/">침수 3D →</a>
   <a href="../">← 조류 모니터로</a>
-</div>
+  </nav>
+</header>
 
 <div class="hud panel left">
-  <h2>표현</h2>
-  <div class="scen" id="chlaMode">
-    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
-    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
-    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
-  </div>
-
+  <p class="panel-notice">위성 추정 · 상대적 분포를 확인하세요</p>
+  <section class="panel-section">
   <h2>기간</h2>
   <div class="scen" id="chlaPeriod">
     <button data-p="all"><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
@@ -27,20 +24,39 @@
   <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
   <div class="swnote">Sentinel-2 추정 Chl-a 가 <b>25 mg/m³</b> 를 넘은 관측일 비율.
     2019–2025, 200 m 구간 1,340개. 논문·대시보드와 같은 값입니다.</div>
+  </section>
 
+  <section class="panel-section">
+  <h2>표현</h2>
+  <div class="scen" id="chlaMode">
+    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
+    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
+    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
+  </div>
+  </section>
+
+  <section class="panel-section">
   <h2>고농도 구간</h2>
   <div class="hotlist" id="hotList"></div>
   <div class="swnote">누르면 그 구간으로 이동합니다.</div>
+  </section>
 
+  <section class="panel-section">
   <h2>조류경보 지점</h2>
   <div class="hotlist" id="stationList"></div>
   <div class="swnote" id="algaeNote">–</div>
+  </section>
 
+  <section class="panel-section view-controls">
 __CONTROLS__
+  </section>
 
+  <section class="panel-section">
   <h2>보는 범위</h2>
   <div class="pools" id="poolPick"></div>
   <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).</div>
+  </section>
+
 </div>
 
 <div class="hud panel readout" id="readout">
@@ -54,6 +70,6 @@ __CONTROLS__
 <div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 확대(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
 
 <div id="loading" class="loading">
-  <div class="lbar"><i id="loadBar"></i></div>
+  <div class="bar"><i id="loadBar"></i></div>
   <div id="loadMsg">자료 받는 중…</div>
 </div>
