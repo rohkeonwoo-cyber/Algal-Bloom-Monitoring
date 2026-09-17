@@ -120,12 +120,18 @@ function select(key){
   el("depthSwatches").innerHTML = `<i style="background:linear-gradient(90deg,${
     Array.from({length:9}, (_, k) => waterCss(maxD * k/8, k/8*100)).join(",")})"></i>`;
 
-  const adj = s.adjusted_gauges;
-  el("valNote").innerHTML = `
+  // 위성 수면 흔적 대조(JRC GSW)·단조 보정·고립부 제외는 **전 구간 계산값**이다.
+  // 담수역 자료에는 그 필드가 없어 "undefined%" 가 찍혔다 — 있을 때만 보여주고,
+  // 없으면 전 구간 화면에서 확인하라고 안내한다(수치를 지어내지 않는다).
+  const hasVal = s.gsw_any_precision !== undefined && s.gsw_permanent_recall !== undefined;
+  const valPart = hasVal ? `
     이 시나리오의 침수역 중 <b>${s.gsw_any_precision}%</b> 가 위성이 관측한 수면 흔적
     (JRC Global Surface Water) 위에 있고, 상시수면의 <b>${s.gsw_permanent_recall}%</b> 를 재현합니다.
     시나리오가 커질수록 앞 수치가 낮아지는 것은 정상입니다 — 홍수터는 평소 물이 없으니까요.<br><br>
-    단조 보정된 관측소 ${adj}개 · 하도 비연결 고립부 ${s.dropped_isolated_km2} km² 제외.<br><br>
+    단조 보정된 관측소 ${s.adjusted_gauges}개 · 하도 비연결 고립부 ${s.dropped_isolated_km2} km² 제외.<br><br>`
+    : `위성 수면 흔적(JRC Global Surface Water) 대조 수치는 <b>전 구간 기준으로 계산</b>했습니다.
+    담수역 화면에서는 표시하지 않습니다 — '보는 범위'에서 <b>전 구간</b>을 고르면 볼 수 있습니다.<br><br>`;
+  el("valNote").innerHTML = valPart + `
     <b>수리모형이 아닙니다.</b> DEM 이 수목·건물 높이를 포함하는 DSM 이고(침수 과소추정),
     30 m 로는 제방·도로를 해상하지 못하며, 통수능·부정류 계산이 없습니다.
     특정 지점의 침수 여부 판정에는 쓸 수 없는 <b>지형 기반 근사</b>입니다.<br><br>
