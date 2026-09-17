@@ -1,17 +1,33 @@
 
 <div id="stage"></div>
 
-<div class="hud topbar">
+<header class="hud topbar">
   <h1 class="display">낙동강 침수 시나리오</h1>
   <span class="sub" id="reachLabel">창녕함안보~합천창녕보</span>
+  <nav class="page-links" aria-label="화면 이동">
   <a href="../chla/">녹조 3D →</a>
   <a href="../">← 조류 모니터로</a>
-</div>
+  </nav>
+</header>
 
 <div class="hud panel left">
+  <p class="panel-notice">수리모형이 아닙니다 · 지형 기반 근사</p>
+  <section class="panel-section">
+  <h2>침수 규모</h2>
+  <div class="stats">
+    <div class="stat"><b class="mono" id="stArea">–</b><span>침수면적 km²</span></div>
+    <div class="stat"><b class="mono" id="stOff">–</b><span>하도 외 km²</span></div>
+    <div class="stat"><b class="mono" id="stDepth">–</b><span>평균수심 m</span></div>
+    <div class="stat"><b class="mono" id="stMax">–</b><span>최대수심 m</span></div>
+  </div>
+  </section>
+
+  <section class="panel-section">
   <h2>수위 시나리오</h2>
   <div class="scen" id="scenList"></div>
+  </section>
 
+  <section class="panel-section">
   <h2>실시간 수위</h2>
   <div class="scen" id="liveBox">
     <button id="liveOn"><i style="background:#2fb6bd"></i><span class="nm">관측 수위로 보기</span>
@@ -29,40 +45,43 @@
       수심을 냅니다. 확산 연결성은 매번 다시 판정하지 않고
       <b>심각수위에서 물이 닿았던 범위</b> 안으로 제한합니다.</div>
   </div>
+  </section>
 
+  <section class="panel-section">
   <h2>지점으로 가기</h2>
-  <select id="goto" style="width:100%; background:var(--surface-2); color:var(--ink-1);
-          border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px;">
+  <select id="goto" class="location-select" aria-label="관측소 선택">
     <option value="">— 관측소 선택 —</option>
   </select>
   <div class="ro-none" style="margin-top:6px">전체 보기로 돌아가려면 목록 맨 위를 다시 고르세요.</div>
+  </section>
 
-  <h2>침수 규모</h2>
-  <div class="stats">
-    <div class="stat"><b class="mono" id="stArea">–</b><span>침수면적 km²</span></div>
-    <div class="stat"><b class="mono" id="stOff">–</b><span>하도 외 km²</span></div>
-    <div class="stat"><b class="mono" id="stDepth">–</b><span>평균수심 m</span></div>
-    <div class="stat"><b class="mono" id="stMax">–</b><span>최대수심 m</span></div>
-  </div>
-
+  <section class="panel-section">
   <h2>보는 범위</h2>
   <div class="pools" id="poolPick"></div>
   <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).
     확대했을 때 물가 선이 훨씬 또렷합니다.</div>
+  </section>
 
+  <section class="panel-section">
   <h2>수심</h2>
   <div class="swatches" id="depthSwatches"></div>
   <div class="swlabels"><span>0 m</span><span id="swMid">–</span><span id="swMax">–</span></div>
   <div class="swnote">얕은 곳은 잠긴 지형이 비쳐 보이고, 깊어질수록 물빛에 가려집니다.</div>
+  </section>
 
+  <section class="panel-section view-controls">
 __CONTROLS__
+  </section>
 
+  <section class="panel-section">
   <h2>검증과 한계</h2>
   <div class="note" id="valNote">–</div>
   <details>
     <summary>어떻게 계산했나</summary>
     <div class="note" id="methodNote"></div>
   </details>
+  </section>
+
 </div>
 
 <div class="hud panel readout" id="readout">

@@ -6,9 +6,7 @@
   </div>
   <div class="ctl">
     <label for="vwOn">항공영상</label>
-    <button id="vwOn" style="flex:1; all:unset; cursor:pointer; text-align:center;
-            border:1px solid var(--border); border-radius:7px; padding:4px 6px;
-            font-size:11.5px; background:var(--surface-2); color:var(--ink-1);"
+    <button id="vwOn" class="layer-button"
             aria-pressed="false">브이월드 0.24 m</button>
   </div>
   <div class="ctl" style="justify-content:space-between">
@@ -17,8 +15,7 @@
 
   <div class="ctl">
     <label for="mres">지형 해상도</label>
-    <select id="mres" style="flex:1; background:var(--surface-2); color:var(--ink-1);
-            border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-size:11.5px;">
+    <select id="mres" class="resolution-select">
       <option value="1">30 m (원본)</option>
       <option value="2">60 m (가벼움)</option>
       <option value="3">90 m (매우 가벼움)</option>
@@ -37,13 +34,13 @@
 
   <div class="ctl">
     <label for="bldOn">건물</label>
-    <button id="bldOn" style="flex:1; all:unset; cursor:pointer; text-align:center;
-      padding:5px 0; border:1px solid var(--border); border-radius:7px;
-      background:var(--surface-2); font-size:12px;" aria-pressed="false">3D 건물 켜기</button>
+    <button id="bldOn" class="layer-button" aria-pressed="false">3D 건물 켜기</button>
   </div>
   <div class="ctl" style="align-items:flex-start">
     <span id="bldStat" style="font-size:10.5px; line-height:1.5">–</span>
   </div>
+
+  <div class="swnote">건물 높이의 절반 이상은 추정값입니다.</div>
 
   <div class="ctl" style="justify-content:space-between">
     <span>지형 정점</span><span class="val mono" id="vertCount" style="width:auto">–</span>

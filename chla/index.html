@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
-    --surface-1:#0d1518; --surface-2:#16232a; --surface-3:#1f3038; --border:#2b414b;
-    --ink-1:#eaf3f2; --ink-2:#a9c0c2; --ink-3:#72898d;
-    --accent:#2fb6bd; --accent-ink:#06282b;
+    --surface-1:#0c1721; --surface-2:#152632; --surface-3:#203948; --border:#36505f;
+    --ink-1:#edf5fa; --ink-2:#b7c9d4; --ink-3:#9aafbd;
+    --accent:#63cee2; --accent-ink:#08232c; --accent-soft:#183d4d;
     --lv-normal:#7e8984; --lv-attn:#ffd95a; --lv-warn:#e68920;
     --lv-alarm:#b8381a; --lv-serious:#6e040b;
     color-scheme: dark;
@@ -15,51 +15,58 @@
   body{ margin:0; background:var(--surface-1); color:var(--ink-1);
         font-family:"Noto Sans KR","Malgun Gothic",sans-serif; overflow:hidden; }
   .mono{ font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
-  .display{ font-family:"Do Hyeon","Noto Sans KR",sans-serif; }
+  .display{ font-family:inherit; }
 
   #stage{ position:fixed; inset:0; }
   canvas{ display:block; }
 
   .hud{ position:fixed; z-index:5; }
   .topbar{
-    top:0; left:0; right:0; padding:12px 18px;
-    background:linear-gradient(180deg, rgba(8,14,16,.92), rgba(8,14,16,0));
-    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; pointer-events:none;
+    top:0; left:0; right:0; min-height:62px; padding:10px 20px;
+    background:rgba(12,23,33,.96); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:18px; pointer-events:none;
   }
-  .topbar h1{ margin:0; font-size:19px; font-weight:400; letter-spacing:.3px; }
-  .topbar .sub{ font-size:12px; color:var(--ink-2); }
-  .topbar a{ color:var(--accent); pointer-events:auto; font-size:12px; margin-left:auto; }
+  .topbar h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:-.5px; }
+  .topbar .sub{ font-size:11px; color:var(--ink-2); }
+  .page-links{ display:flex; gap:8px; margin-left:auto; flex-shrink:0; pointer-events:auto; }
+  .page-links a{ color:var(--ink-2); font-size:11px; text-decoration:none;
+    padding:7px 10px; border:1px solid var(--border); border-radius:6px; }
+  .page-links a:hover{ color:var(--ink-1); background:var(--surface-3); }
 
   .panel{
-    background:rgba(22,35,42,.93); border:1px solid var(--border); border-radius:14px;
-    padding:14px 16px; backdrop-filter:blur(8px);
+    background:rgba(12,23,33,.94); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; backdrop-filter:blur(12px); box-shadow:0 6px 24px #0003;
   }
-  .left{ left:18px; top:64px; width:296px; max-height:calc(100vh - 96px); overflow-y:auto; }
-  .left h2{ margin:0 0 9px; font-size:11px; letter-spacing:.7px; text-transform:uppercase;
-            color:var(--ink-3); font-weight:600; }
-  .left h2:not(:first-child){ margin-top:20px; }
+  .left{ left:14px; top:76px; width:280px; max-height:calc(100dvh - 120px);
+    overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin;
+    scrollbar-color:var(--border) transparent; }
+  .panel-notice{ margin:0 0 12px; color:var(--ink-2); font-size:11px; line-height:1.6;
+    padding:0 0 10px; border-bottom:1px solid var(--border); }
+  .panel-section + .panel-section{ margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+  .left h2{ margin:0 0 9px; font-size:12px; letter-spacing:.2px;
+    color:var(--ink-1); font-weight:600; }
 
   .scen{ display:flex; flex-direction:column; gap:5px; }
   .scen button{
-    all:unset; cursor:pointer; display:flex; align-items:center; gap:9px;
-    padding:8px 10px; border-radius:9px; border:1px solid var(--border);
-    font-size:13px; background:var(--surface-2);
+    all:unset; box-sizing:border-box; cursor:pointer; display:flex; align-items:center; gap:9px;
+    padding:7px 9px; border-radius:6px; border:1px solid var(--border);
+    font-size:12px; min-height:36px; background:var(--surface-2);
   }
   .scen button:hover{ background:var(--surface-3); }
   .scen button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
-  .scen button[aria-pressed="true"]{ border-color:var(--accent); background:#12333a; }
+  .scen button[aria-pressed="true"]{ border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 3px 0 var(--accent); }
   .scen i{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
   .scen .nm{ flex:1; }
   .scen .km2{ font-size:11.5px; color:var(--ink-2); }
 
-  .stats{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .stat{ background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:8px 10px; }
-  .stat b{ display:block; font-family:"JetBrains Mono",monospace; font-size:17px; font-weight:600; }
-  .stat span{ font-size:10px; color:var(--ink-3); }
+  .stats{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .stat{ background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:9px 10px; }
+  .stat b{ display:block; font-family:"JetBrains Mono",monospace; font-size:23px; letter-spacing:-.8px; font-weight:600; }
+  .stat span{ font-size:11px; color:var(--ink-3); }
 
   .ctl{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-2); margin-top:6px; }
-  .ctl input[type=range]{ flex:1; accent-color:var(--accent); }
-  .ctl .val{ width:34px; text-align:right; }
+  .ctl input[type=range]{ flex:1; min-width:0; height:24px; cursor:pointer; accent-color:var(--accent); }
+  .ctl .val{ min-width:42px; text-align:right; }
 
   /* 범례는 "지형 위에 물이 얹힌 상태"를 보여야 한다 — 얕은 쪽이 비치는 게 핵심이므로
      단색 칩을 나열하는 대신 지형색 바탕에 실제 감쇠식으로 계산한 그라디언트를 덮는다. */
@@ -85,10 +92,10 @@
   .err{ color:#ff9b7a; font-size:12.5px; max-width:460px; line-height:1.6; text-align:center; }
 
   .readout{
-    right:18px; top:64px; width:212px;
+    right:14px; top:76px; width:228px; max-height:calc(100dvh - 120px); overflow-y:auto;
   }
   .readout h2{ margin:0 0 10px; font-size:11px; letter-spacing:.7px; text-transform:uppercase;
-               color:var(--ink-3); font-weight:600; }
+               color:var(--ink-2); font-weight:600; }
   .ro-row{ display:flex; align-items:baseline; justify-content:space-between; gap:10px;
            padding:5px 0; border-top:1px solid var(--border); }
   .ro-row:first-of-type{ border-top:none; }
@@ -101,11 +108,8 @@
   @media (max-width:900px){ .readout{ display:none; } }
 
   .hint{ bottom:14px; left:50%; transform:translateX(-50%); font-size:11.5px;
-         color:var(--ink-3); background:rgba(13,21,24,.8); padding:5px 12px; border-radius:20px; }
+         color:var(--ink-2); background:rgba(12,23,33,.94); padding:5px 12px; border-radius:20px; }
 
-  @media (max-width:720px){
-    .left{ left:8px; right:8px; width:auto; top:58px; max-height:44vh; }
-  }
 
   /* 담수역 선택 — 누르면 그 구간 자료로 페이지를 다시 연다 */
   .pools{display:flex; flex-wrap:wrap; gap:5px; margin:2px 0 6px}
@@ -118,8 +122,8 @@
   .poolbtn .km2{font-size:10.5px; opacity:.8}
   /* 고농도·지점 목록 */
   .hotlist{display:flex; flex-direction:column; gap:3px; margin:2px 0 6px}
-  .hot{display:flex; align-items:center; gap:7px; width:100%; padding:5px 7px;
-       border:1px solid transparent; border-radius:7px; background:var(--surface-2);
+  .hot{display:flex; align-items:center; gap:7px; width:100%; padding:7px 8px;
+       border:1px solid var(--border); border-radius:6px; background:var(--surface-2);
        color:var(--ink-2); font:inherit; font-size:12px; text-align:left; cursor:pointer}
   .hot:hover{border-color:var(--accent); color:var(--ink-1)}
   .hot i{width:9px; height:9px; border-radius:2px; flex:0 0 auto}
@@ -129,33 +133,84 @@
   /* 종단 분포 그래프 */
   .profile{margin:2px 0 4px; cursor:crosshair}
   .profile svg{display:block}
+  .profile svg text{font-size:12px; fill:var(--ink-2)}
   .readout h2:not(:first-child){ margin-top:16px; }
   /* 날짜 재생 */
-  .daybtn{padding:4px 9px; border:1px solid var(--border); border-radius:7px;
+  .daybtn{min-height:32px; padding:5px 10px; border:1px solid var(--border); border-radius:7px;
           background:var(--surface-2); color:var(--ink-2); font:inherit; font-size:12px; cursor:pointer}
   .daybtn:hover{border-color:var(--accent); color:var(--ink-1)}
   .daybtn.wide{flex:1; text-align:center}
   #dayBox .ctl{margin:4px 0}
   #daySlider{flex:1}
+
+  /* Shared native controls keep hover, pressed and keyboard focus equally legible. */
+  button, select, a, summary, input{ -webkit-tap-highlight-color:transparent; }
+  :is(button, select, a, summary, input):focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+  select, .layer-button{ border:1px solid var(--border); border-radius:6px;
+    background:var(--surface-2); color:var(--ink-1); font:inherit; font-size:12px;
+    min-height:34px; padding:6px 8px; cursor:pointer; }
+  .location-select{ width:100%; }
+  .resolution-select, .layer-button{ flex:1; min-width:0; }
+  .layer-button:hover, select:hover{ border-color:var(--accent); background:var(--surface-3); }
+  .layer-button[aria-pressed="true"]{ border-color:var(--accent); background:var(--accent-soft); }
+  button:disabled, input:disabled{ cursor:not-allowed; }
+  .hot::after{ content:"›"; color:var(--accent); font-size:16px; }
+  .hot .nm{ min-width:0; }
+  .hot b{ white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .poolbtn{ min-width:0; }
+  .poolbtn .km2{ overflow-wrap:anywhere; }
+  #dayBox{ padding:8px; margin-top:8px; background:var(--surface-1); border:1px solid var(--border); border-radius:6px; }
+  #dayBox .ctl{ flex-wrap:wrap; }
+  #daySlider{ min-width:80px; }
+  #valNote{ border-left:2px solid var(--border); padding-left:10px; }
+  .view-controls .ctl{ min-height:28px; }
+  .view-controls label{ flex:0 0 68px; }
+
+  @media (max-width:1100px){
+    .topbar{ flex-wrap:wrap; gap:4px 14px; }
+    .topbar .sub{ order:3; flex-basis:100%; }
+    .topbar h1{ font-size:16px; }
+  }
+  /* A bottom sheet leaves the map and page navigation unobstructed on phones. */
+  @media (max-width:720px){
+    .topbar{ padding:9px 12px; min-height:74px; }
+    .topbar h1{ font-size:15px; }
+    .topbar .sub{ font-size:10px; line-height:1.5; }
+    .page-links{ gap:4px; }
+    .page-links a{ padding:6px; font-size:10px; }
+    .left{ top:auto; bottom:8px; left:8px; right:8px; width:auto;
+      max-height:42dvh; padding:12px; border-radius:12px; }
+    .stats{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .stat{ padding:8px 6px; }
+    .stat b{ font-size:20px; }
+    .stat span{ font-size:10px; }
+    .hint{ top:82px; bottom:auto; width:max-content; max-width:calc(100% - 24px);
+      font-size:10px; line-height:1.6; padding:6px 10px; border-radius:6px; pointer-events:none; }
+    .scen button{ min-height:38px; }
+    .poolbtn{ flex-basis:28%; }
+  }
+  @media (max-width:360px){
+    .topbar{ gap:4px; }
+    .page-links a{ padding:5px 4px; font-size:9px; }
+    .topbar h1{ font-size:14px; }
+    .stats{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
 </style>
 
 <div id="stage"></div>
 
-<div class="hud topbar">
+<header class="hud topbar">
   <h1 class="display">낙동강 녹조 분포</h1>
   <span class="sub" id="reachLabel">낙동강 본류</span>
+  <nav class="page-links" aria-label="화면 이동">
   <a href="../flood/">침수 3D →</a>
   <a href="../">← 조류 모니터로</a>
-</div>
+  </nav>
+</header>
 
 <div class="hud panel left">
-  <h2>표현</h2>
-  <div class="scen" id="chlaMode">
-    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
-    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
-    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
-  </div>
-
+  <p class="panel-notice">위성 추정 · 상대적 분포를 확인하세요</p>
+  <section class="panel-section">
   <h2>기간</h2>
   <div class="scen" id="chlaPeriod">
     <button data-p="all"><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
@@ -167,15 +222,30 @@
   <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
   <div class="swnote">Sentinel-2 추정 Chl-a 가 <b>25 mg/m³</b> 를 넘은 관측일 비율.
     2019–2025, 200 m 구간 1,340개. 논문·대시보드와 같은 값입니다.</div>
+  </section>
 
+  <section class="panel-section">
+  <h2>표현</h2>
+  <div class="scen" id="chlaMode">
+    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
+    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
+    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
+  </div>
+  </section>
+
+  <section class="panel-section">
   <h2>고농도 구간</h2>
   <div class="hotlist" id="hotList"></div>
   <div class="swnote">누르면 그 구간으로 이동합니다.</div>
+  </section>
 
+  <section class="panel-section">
   <h2>조류경보 지점</h2>
   <div class="hotlist" id="stationList"></div>
   <div class="swnote" id="algaeNote">–</div>
+  </section>
 
+  <section class="panel-section view-controls">
   <h2>보기</h2>
   <div class="ctl">
     <label for="vex">수직과장</label>
@@ -184,9 +254,7 @@
   </div>
   <div class="ctl">
     <label for="vwOn">항공영상</label>
-    <button id="vwOn" style="flex:1; all:unset; cursor:pointer; text-align:center;
-            border:1px solid var(--border); border-radius:7px; padding:4px 6px;
-            font-size:11.5px; background:var(--surface-2); color:var(--ink-1);"
+    <button id="vwOn" class="layer-button"
             aria-pressed="false">브이월드 0.24 m</button>
   </div>
   <div class="ctl" style="justify-content:space-between">
@@ -195,8 +263,7 @@
 
   <div class="ctl">
     <label for="mres">지형 해상도</label>
-    <select id="mres" style="flex:1; background:var(--surface-2); color:var(--ink-1);
-            border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-size:11.5px;">
+    <select id="mres" class="resolution-select">
       <option value="1">30 m (원본)</option>
       <option value="2">60 m (가벼움)</option>
       <option value="3">90 m (매우 가벼움)</option>
@@ -215,22 +282,26 @@
 
   <div class="ctl">
     <label for="bldOn">건물</label>
-    <button id="bldOn" style="flex:1; all:unset; cursor:pointer; text-align:center;
-      padding:5px 0; border:1px solid var(--border); border-radius:7px;
-      background:var(--surface-2); font-size:12px;" aria-pressed="false">3D 건물 켜기</button>
+    <button id="bldOn" class="layer-button" aria-pressed="false">3D 건물 켜기</button>
   </div>
   <div class="ctl" style="align-items:flex-start">
     <span id="bldStat" style="font-size:10.5px; line-height:1.5">–</span>
   </div>
 
+  <div class="swnote">건물 높이의 절반 이상은 추정값입니다.</div>
+
   <div class="ctl" style="justify-content:space-between">
     <span>지형 정점</span><span class="val mono" id="vertCount" style="width:auto">–</span>
   </div>
 
+  </section>
 
+  <section class="panel-section">
   <h2>보는 범위</h2>
   <div class="pools" id="poolPick"></div>
   <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).</div>
+  </section>
+
 </div>
 
 <div class="hud panel readout" id="readout">
@@ -244,7 +315,7 @@
 <div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 확대(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
 
 <div id="loading" class="loading">
-  <div class="lbar"><i id="loadBar"></i></div>
+  <div class="bar"><i id="loadBar"></i></div>
   <div id="loadMsg">자료 받는 중…</div>
 </div>
 
