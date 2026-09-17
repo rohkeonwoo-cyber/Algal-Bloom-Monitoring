@@ -1,0 +1,59 @@
+
+<div id="stage"></div>
+
+<div class="hud topbar">
+  <h1 class="display">낙동강 녹조 분포</h1>
+  <span class="sub" id="reachLabel">낙동강 본류</span>
+  <a href="../flood/">침수 3D →</a>
+  <a href="../">← 조류 모니터로</a>
+</div>
+
+<div class="hud panel left">
+  <h2>표현</h2>
+  <div class="scen" id="chlaMode">
+    <button data-m="surface"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">수면색</span><span class="km2 mono">강물에 칠하기</span></button>
+    <button data-m="ribbon"><i style="background:linear-gradient(90deg,#2f6fe0,#0e9aa8,#57c06b,#e8c93c,#ef7c1f,#c62317)"></i><span class="nm">리본</span><span class="km2 mono">수면 위에 띄우기</span></button>
+    <button data-m="off"><i style="background:#3a4a4f"></i><span class="nm">끄기</span><span class="km2 mono">지형만</span></button>
+  </div>
+
+  <h2>기간</h2>
+  <div class="scen" id="chlaPeriod">
+    <button data-p="all"><span class="nm">전기간 평균</span><span class="km2 mono" id="chlaAllR">–</span></button>
+    <button data-p="jja"><span class="nm">여름(JJA)</span><span class="km2 mono" id="chlaJjaR">–</span></button>
+    <button data-p="daily"><span class="nm">날짜별</span><span class="km2 mono">2019~2025</span></button>
+  </div>
+  <div id="dayBox" hidden></div>
+  <div class="swatches" id="chlaSwatches" style="background:#20333a"></div>
+  <div class="swlabels"><span id="chlaLo">–</span><span id="chlaMid">–</span><span id="chlaHi">–</span></div>
+  <div class="swnote">Sentinel-2 추정 Chl-a 가 <b>25 mg/m³</b> 를 넘은 관측일 비율.
+    2019–2025, 200 m 구간 1,340개. 논문·대시보드와 같은 값입니다.</div>
+
+  <h2>고농도 구간</h2>
+  <div class="hotlist" id="hotList"></div>
+  <div class="swnote">누르면 그 구간으로 이동합니다.</div>
+
+  <h2>조류경보 지점</h2>
+  <div class="hotlist" id="stationList"></div>
+  <div class="swnote" id="algaeNote">–</div>
+
+__CONTROLS__
+
+  <h2>보는 범위</h2>
+  <div class="pools" id="poolPick"></div>
+  <div class="swnote">담수역을 고르면 지형을 <b>30 m</b> 로 봅니다(전 구간은 90 m).</div>
+</div>
+
+<div class="hud panel readout" id="readout">
+  <h2>종단 분포</h2>
+  <div class="profile" id="profile"></div>
+  <div class="swnote" id="profNote">하구(0 km) → 상류(268 km). 누르면 그 위치로 이동합니다.</div>
+  <h2>가리킨 지점</h2>
+  <div id="roBody"><div class="ro-none">강 위에 마우스를 올리면 그 구간의 초과빈도를 읽습니다.</div></div>
+</div>
+
+<div class="hud hint">왼쪽 드래그 <b>이동</b> · 휠 확대(커서 기준) · 더블클릭 <b>그 지점으로</b> · 오른쪽 드래그(또는 Shift) 회전</div>
+
+<div id="loading" class="loading">
+  <div class="lbar"><i id="loadBar"></i></div>
+  <div id="loadMsg">자료 받는 중…</div>
+</div>

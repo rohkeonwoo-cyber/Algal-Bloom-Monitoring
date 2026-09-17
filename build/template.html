@@ -413,6 +413,31 @@
       </div>
     </div>
 
+    <a class="flood-link" href="map/">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 20 3 17V4l6 3 6-3 6 3v13l-6 3-6-3Z"></path>
+        <path d="M9 7v13M15 4v13"></path>
+      </svg>
+      <span>
+        <b>전국 조류경보 지점 지도</b>
+        4대강 보와 호소를 포함한 68개 지점의 유해남조류 세포수와 판정 단계를
+        지도에서 봅니다
+      </span>
+    </a>
+
+    <a class="flood-link" href="chla/">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 17c2 0 2-1.5 4-1.5S9 17 11 17s2-1.5 4-1.5S17 17 19 17s2-1.5 2-1.5"></path>
+        <path d="M7 13c0-3 2-5 5-6 0 3-1 5-5 6Z"></path>
+        <path d="M12 7c3 1 5 3 5 6-3 0-5-1-5-6Z"></path>
+      </svg>
+      <span>
+        <b>녹조 분포 3D</b>
+        강물을 Chl-a 초과빈도 색으로 칠해, 어느 구간이 오래 고농도였는지를
+        3차원 지형 위에서 봅니다
+      </span>
+    </a>
+
     <a class="flood-link" href="flood/">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 15c1.6 0 1.6-1.4 3.2-1.4S7.8 15 9.4 15s1.6-1.4 3.2-1.4S14.2 15 15.8 15s1.6-1.4 3.2-1.4S20.6 15 22 15"></path>
@@ -1092,18 +1117,19 @@ function fmtObsTime(ymdhm){   // "2026091116" → "09.11 16:00"
 }
 
 // ---- 조류경보 4개 지점 위치 ----
-// 조류경보 원자료(08d)의 SWMN_DETAIL_NM 에 기관이 적어둔 "○○보 상류 N km" 를
-// 04_구조물.csv 의 보 종단거리(dfe_km)에 더해 구한 값. 위경도를 임의로 넣지 않는다.
-// 산출근거와 역투영 검산은 build/지점위치산출.py 참조.
-//   해평     = 칠곡보 191.38 + 22 = 213.38   (역투영 128.369,36.190 ↔ 구미 해평면)
-//   강정고령 = 강정고령보 165.91 + 7 = 172.91
-//   칠서     = 창녕함안보 74.14 + 12 = 86.14
-//   물금매리 = 보 기준 거리가 원자료에 없어 인접 지류인 양산천 합류부(20.92)로 근사
+// 물환경정보시스템이 공개하는 지점 좌표(data/algae_points.csv)를 EPSG:5186 으로 투영해
+// 가장 가까운 종단구간의 s 를 쓴다. 산출·검산은 build/지점위치산출.py 참조.
+//
+// 2026-09-16 교정: 이전에는 기관이 적어둔 "○○보 상류 N km" 를 보 종단거리에 더해
+// 역산했는데, 공식 좌표와 대조하니 2.9~8.6 km 어긋나 있었다(물금매리가 가장 크게 틀렸다).
+//   해평     213.38 → 210.5   강정고령 172.91 → 167.1
+//   칠서      86.14 →  81.7   물금매리  20.92 →  29.5
+// 네 지점 모두 공식 좌표가 본류 중심선에서 109~233 m 안에 떨어진다(= 실제 강 위의 지점).
 const ALGAE_PTS = [
-  {name:"해평",     s:213.38, approx:false, basis:"칠곡보 상류 22km"},
-  {name:"강정고령", s:172.91, approx:false, basis:"강정고령보 상류 7km"},
-  {name:"칠서",     s:86.14,  approx:false, basis:"창녕함안보 상류 12km"},
-  {name:"물금매리", s:20.92,  approx:true,  basis:"양산천 합류부 기준 근사"},
+  {name:"해평",     s:210.5, approx:false, basis:"구미시 해평면 문량리 (공식좌표)"},
+  {name:"강정고령", s:167.1, approx:false, basis:"달성군 다사읍 매곡리 (공식좌표)"},
+  {name:"칠서",     s:81.7,  approx:false, basis:"함안군 칠서면 계내리 (공식좌표)"},
+  {name:"물금매리", s:29.5,  approx:false, basis:"김해시 상동면 매리 (공식좌표)"},
 ];
 // s(km) 에 가장 가까운 구간의 화면좌표를 쓴다 — 구간은 200m 간격이므로 오차는 100m 이내
 function svgForS(sKm){
